@@ -41,21 +41,19 @@ const Header: React.FC = () => {
             </button>
           </div>
           <Link className="flex items-center gap-2 text-sm font-semibold text-white" to="/">
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-950/80 ring-1 ring-red-500/40 shadow-glow">
-            <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
-              <defs>
-                <linearGradient id="dinocoMark" x1="0" y1="0" x2="1" y2="1">
-                  <stop offset="0%" stopColor="#ef4444" />
-                  <stop offset="100%" stopColor="#8b5cf6" />
-                </linearGradient>
-              </defs>
-              <path
-                d="M4.5 18.5L10.2 5.8c.2-.4.7-.4.9 0l5.6 12.7a.6.6 0 0 1-.5.9h-2.7a.6.6 0 0 1-.6-.4l-.8-2H9.9l-.8 2a.6.6 0 0 1-.6.4H5a.6.6 0 0 1-.5-.9Zm6-5.6h2.1L11.6 9.6l-1.1 3.3Z"
-                fill="url(#dinocoMark)"
-              />
-            </svg>
-          </span>
-          <span className="tracking-[0.25em] text-[11px] uppercase text-slate-200">Dinoco</span>
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-950/80 ring-1 ring-slate-700/60 shadow-glow">
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+                className="text-red-400"
+              >
+                <circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" strokeWidth="1.6" />
+                <path d="M10 8.3L15.7 12 10 15.7Z" fill="currentColor" />
+              </svg>
+            </span>
+            <span className="tracking-[0.25em] text-[11px] uppercase text-slate-200">Dinoco</span>
           </Link>
         </div>
         <nav className="flex items-center gap-5 text-[10px] uppercase tracking-[0.25em] text-slate-300">
