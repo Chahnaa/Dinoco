@@ -1,0 +1,40 @@
+version: '3.8'
+services:
+  db:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_DATABASE: movie_review_db
+      MYSQL_USER: movieuser
+      MYSQL_PASSWORD: StrongPassword!
+    ports:
+      - "3306:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
+
+  backend:
+    build: .
+    command: sh -c "pip install -r requirements.txt && PORT=5002 python app.py"
+    ports:
+      - "5002:5002"
+    environment:
+      DB_HOST: db
+      DB_USER: movieuser
+      DB_PASSWORD: StrongPassword!
+      DB_NAME: movie_review_db
+      PORT: 5002
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASS: ${SMTP_PASS}
+      SMTP_FROM: ${SMTP_FROM}
+      SMTP_USE_TLS: ${SMTP_USE_TLS}
+    depends_on:
+      - db
+    volumes:
+      - ./:/app
+
+volumes:
+  db_data:
