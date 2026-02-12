@@ -41,16 +41,19 @@ const Header: React.FC = () => {
             </button>
           </div>
           <Link className="flex items-center gap-2 text-sm font-semibold text-white" to="/">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-950/80 ring-1 ring-slate-700/60 shadow-glow">
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-950/80 ring-1 ring-red-500/60">
               <svg
-                width="18"
-                height="18"
+                width="22"
+                height="22"
                 viewBox="0 0 24 24"
                 aria-hidden="true"
                 className="text-red-400"
               >
-                <circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" strokeWidth="1.6" />
-                <path d="M10 8.3L15.7 12 10 15.7Z" fill="currentColor" />
+                <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" strokeWidth="1.6" />
+                <path
+                  d="M9 7.5h3.2c2.6 0 4.3 1.6 4.3 4.5s-1.7 4.5-4.3 4.5H9V7.5Zm1.8 1.6v5.8h1.5c1.7 0 2.8-1.1 2.8-2.9s-1.1-2.9-2.8-2.9h-1.5Z"
+                  fill="currentColor"
+                />
               </svg>
             </span>
             <span className="tracking-[0.25em] text-[11px] uppercase text-slate-200">Dinoco</span>

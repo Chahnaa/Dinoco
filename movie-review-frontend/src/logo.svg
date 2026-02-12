@@ -1,5 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
 	<title>Dinoco</title>
 	<circle cx="100" cy="100" r="86" fill="none" stroke="#0f172a" stroke-width="12" />
-	<path d="M86 70L140 100L86 130Z" fill="#0f172a" />
+	<path
+		d="M78 58h34c27 0 44 17 44 46s-17 46-44 46H78V58Zm18 16v68h16c18 0 29-12 29-34s-11-34-29-34H96Z"
+		fill="#0f172a"
+	/>
 </svg>

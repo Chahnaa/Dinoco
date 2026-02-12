@@ -1,11 +1,14 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { FaSearch } from "react-icons/fa";
+import { FaChartLine, FaSearch, FaStar, FaUserFriends } from "react-icons/fa";
 import { getMovies } from "../api/api";
 import MovieCard from "../components/MovieCard";
 
 const SearchIcon = FaSearch as unknown as React.ComponentType<{ className?: string }>;
+const UsersIcon = FaUserFriends as unknown as React.ComponentType<{ className?: string }>;
+const ChartIcon = FaChartLine as unknown as React.ComponentType<{ className?: string }>;
+const StarIcon = FaStar as unknown as React.ComponentType<{ className?: string }>;
 
 interface Movie {
   movie_id: number;
@@ -114,6 +117,60 @@ const Home: React.FC = () => {
               </div>
             </div>
           </motion.div>
+        </div>
+      </section>
+
+      <section className="grid gap-4 md:grid-cols-3">
+        <div className="glass card-glow rounded-2xl border border-slate-800/60 p-5">
+          <div className="flex items-center gap-3 text-red-300">
+            <UsersIcon className="text-base" />
+            <p className="text-[10px] uppercase tracking-[0.25em]">Community</p>
+          </div>
+          <h3 className="mt-3 text-lg font-semibold text-white">Create your critic profile</h3>
+          <p className="mt-2 text-xs text-slate-300">Save your favorites, follow reviewers, and keep a watchlist.</p>
+          <Link to="/register" className="mt-4 inline-flex text-xs font-semibold uppercase tracking-wide text-red-300 hover:text-white">
+            Get started →
+          </Link>
+        </div>
+        <div className="glass card-glow rounded-2xl border border-slate-800/60 p-5">
+          <div className="flex items-center gap-3 text-red-300">
+            <StarIcon className="text-base" />
+            <p className="text-[10px] uppercase tracking-[0.25em]">Ratings</p>
+          </div>
+          <h3 className="mt-3 text-lg font-semibold text-white">Rate in seconds</h3>
+          <p className="mt-2 text-xs text-slate-300">Drop quick reactions or full reviews from any device.</p>
+          <Link to="/browse" className="mt-4 inline-flex text-xs font-semibold uppercase tracking-wide text-red-300 hover:text-white">
+            Explore films →
+          </Link>
+        </div>
+        <div className="glass card-glow rounded-2xl border border-slate-800/60 p-5">
+          <div className="flex items-center gap-3 text-red-300">
+            <ChartIcon className="text-base" />
+            <p className="text-[10px] uppercase tracking-[0.25em]">Insights</p>
+          </div>
+          <h3 className="mt-3 text-lg font-semibold text-white">Track what’s trending</h3>
+          <p className="mt-2 text-xs text-slate-300">Follow momentum, top picks, and weekly highlights.</p>
+          <a href="#trending" className="mt-4 inline-flex text-xs font-semibold uppercase tracking-wide text-red-300 hover:text-white">
+            See charts →
+          </a>
+        </div>
+      </section>
+
+      <section className="grid gap-4 rounded-3xl border border-slate-800/60 bg-slate-950/60 p-5 md:grid-cols-3">
+        <div className="space-y-2">
+          <p className="text-[10px] uppercase tracking-[0.3em] text-slate-400">Live now</p>
+          <p className="text-xl font-semibold text-white">2.3k</p>
+          <p className="text-xs text-slate-400">Active movie discussions</p>
+        </div>
+        <div className="space-y-2">
+          <p className="text-[10px] uppercase tracking-[0.3em] text-slate-400">Weekly reviews</p>
+          <p className="text-xl font-semibold text-white">14.8k</p>
+          <p className="text-xs text-slate-400">Fresh reactions added</p>
+        </div>
+        <div className="space-y-2">
+          <p className="text-[10px] uppercase tracking-[0.3em] text-slate-400">Average rating</p>
+          <p className="text-xl font-semibold text-white">4.6/5</p>
+          <p className="text-xs text-slate-400">Audience sentiment score</p>
         </div>
       </section>
 
