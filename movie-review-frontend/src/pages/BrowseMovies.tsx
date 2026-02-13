@@ -2,6 +2,7 @@ import React from "react";
 import { motion } from "framer-motion";
 import { FaFilm, FaChevronLeft, FaChevronRight } from "react-icons/fa";
 import MovieCard from "../components/MovieCard";
+import MoodSelector, { Mood, moodOptions } from "../components/MoodSelector";
 import { getMovies } from "../api/api";
 
 const FilmIcon = FaFilm as unknown as React.ComponentType<{ className?: string }>;
@@ -29,6 +30,7 @@ const BrowseMovies: React.FC = () => {
   const [minRating, setMinRating] = React.useState("All");
   const [sortBy, setSortBy] = React.useState("newest");
   const [currentPage, setCurrentPage] = React.useState(1);
+  const [selectedMood, setSelectedMood] = React.useState<Mood | null>(null);
   const itemsPerPage = 6;
 
   React.useEffect(() => {
@@ -52,10 +54,19 @@ const BrowseMovies: React.FC = () => {
   const filteredMovies = React.useMemo(() => {
     let result = movies.filter(movie => {
       const matchesSearch = movie.title.toLowerCase().includes(search.toLowerCase());
-      const matchesGenre = genre === "All" || movie.genre === genre;
+      
+      // Mood-based filtering
+      let matchesGenreOrMood = true;
+      if (selectedMood) {
+        const moodGenres = moodOptions.find(m => m.id === selectedMood)?.genres || [];
+        matchesGenreOrMood = moodGenres.some(g => movie.genre?.includes(g));
+      } else {
+        matchesGenreOrMood = genre === "All" || movie.genre === genre;
+      }
+      
       const ratingValue = movie.avg_rating ? Number(movie.avg_rating) : 0;
       const matchesRating = minRating === "All" || ratingValue >= Number(minRating);
-      return matchesSearch && matchesGenre && matchesRating;
+      return matchesSearch && matchesGenreOrMood && matchesRating;
     });
 
     // Sort
@@ -74,7 +85,7 @@ const BrowseMovies: React.FC = () => {
     }
 
     return result;
-  }, [movies, search, genre, minRating, sortBy]);
+  }, [movies, search, genre, minRating, sortBy, selectedMood]);
 
   const totalPages = Math.ceil(filteredMovies.length / itemsPerPage);
   const paginatedMovies = React.useMemo(() => {
@@ -84,7 +95,7 @@ const BrowseMovies: React.FC = () => {
 
   React.useEffect(() => {
     setCurrentPage(1);
-  }, [search, genre, minRating, sortBy]);
+  }, [search, genre, minRating, sortBy, selectedMood]);
 
   return (
     <div className="relative left-1/2 right-1/2 w-screen -ml-[50vw] -mr-[50vw] bg-gradient-to-b from-red-950/60 via-[#050505] to-black py-8">
@@ -106,6 +117,22 @@ const BrowseMovies: React.FC = () => {
         </div>
       </motion.div>
 
+      {/* Mood-Based Discovery - INNOVATIVE FEATURE */}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, delay: 0.1 }}
+        className="glass rounded-2xl border border-slate-800/60 p-5"
+      >
+        <MoodSelector
+          selectedMood={selectedMood}
+          onMoodSelect={(mood) => {
+            setSelectedMood(mood);
+            if (mood) setGenre("All"); // Clear genre filter when mood is selected
+          }}
+        />
+      </motion.div>
+
       <div className="glass rounded-2xl border border-slate-800/60 p-4">
         <div className="grid gap-3 md:grid-cols-[1.2fr_0.6fr_0.6fr_0.6fr] md:items-end">
           <div className="relative">
@@ -121,8 +148,14 @@ const BrowseMovies: React.FC = () => {
             <label className="text-[10px] uppercase tracking-[0.2em] text-slate-400">Genre</label>
             <select
               value={genre}
-              onChange={e => setGenre(e.target.value)}
-              className="mt-2 w-full rounded-xl border border-slate-700/70 bg-slate-950/40 px-3 py-2 text-sm text-white outline-none focus:border-red-400/60"
+              onChange={e => {
+                setGenre(e.target.value);
+                if (e.target.value !== "All") setSelectedMood(null); // Clear mood when genre is selected
+              }}
+              disabled={selectedMood !== null}
+              className={`mt-2 w-full rounded-xl border border-slate-700/70 bg-slate-950/40 px-3 py-2 text-sm text-white outline-none focus:border-red-400/60 ${
+                selectedMood ? "opacity-50 cursor-not-allowed" : ""
+              }`}
             >
               {genres.map(value => (
                 <option key={value} value={value} className="bg-slate-950">
