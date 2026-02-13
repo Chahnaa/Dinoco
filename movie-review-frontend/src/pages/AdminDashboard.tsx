@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { FaChartBar, FaFilm, FaUsers } from 'react-icons/fa'
-import { getMovies, getStats, deleteMovie, editMovie } from '../api/api'
+import { getMovies, getStats, deleteMovie, editMovie, addMovie } from '../api/api'
 
 type Stats = {
   total_movies: number
@@ -25,6 +25,10 @@ const AdminDashboard: React.FC = () => {
   const [editingId, setEditingId] = useState<number | null>(null)
   const [editTitle, setEditTitle] = useState('')
   const [editDescription, setEditDescription] = useState('')
+  const [isAddingMovie, setIsAddingMovie] = useState(false)
+  const [newMovieTitle, setNewMovieTitle] = useState('')
+  const [newMovieDescription, setNewMovieDescription] = useState('')
+  const [newMoviePoster, setNewMoviePoster] = useState('')
 
   const loadMovies = () => {
     getMovies()
@@ -77,6 +81,30 @@ const AdminDashboard: React.FC = () => {
     }
   }
 
+  const handleAddMovie = async () => {
+    if (!newMovieTitle.trim()) {
+      alert('Movie title is required')
+      return
+    }
+    try {
+      await addMovie({
+        title: newMovieTitle,
+        description: newMovieDescription,
+        poster_url: newMoviePoster
+      })
+      loadMovies()
+      getStats()
+        .then(res => setStats(res.data))
+        .catch(() => setStats(null))
+      setIsAddingMovie(false)
+      setNewMovieTitle('')
+      setNewMovieDescription('')
+      setNewMoviePoster('')
+    } catch (error) {
+      alert('Failed to add movie')
+    }
+  }
+
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-8">
       <div className="space-y-2">
@@ -107,11 +135,58 @@ const AdminDashboard: React.FC = () => {
         <div className="glass rounded-2xl p-5">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-semibold text-white">Latest Movies</h3>
-            <button className="rounded-xl border border-slate-700/60 px-3 py-2 text-xs text-slate-300">
+            <button 
+              onClick={() => setIsAddingMovie(true)}
+              className="rounded-xl border border-slate-700/60 px-3 py-2 text-xs text-slate-300 hover:border-red-400 hover:text-red-300 transition-colors"
+            >
               Add Movie
             </button>
           </div>
           <div className="mt-4 space-y-3 text-xs text-slate-300">
+            {isAddingMovie && (
+              <div className="px-3 py-3 space-y-2 bg-slate-800/30 rounded-lg">
+                <input
+                  type="text"
+                  value={newMovieTitle}
+                  onChange={(e) => setNewMovieTitle(e.target.value)}
+                  className="w-full bg-slate-800/50 rounded px-2 py-1 text-white text-xs"
+                  placeholder="Movie title"
+                />
+                <textarea
+                  value={newMovieDescription}
+                  onChange={(e) => setNewMovieDescription(e.target.value)}
+                  className="w-full bg-slate-800/50 rounded px-2 py-1 text-white text-xs"
+                  placeholder="Description"
+                  rows={2}
+                />
+                <input
+                  type="text"
+                  value={newMoviePoster}
+                  onChange={(e) => setNewMoviePoster(e.target.value)}
+                  className="w-full bg-slate-800/50 rounded px-2 py-1 text-white text-xs"
+                  placeholder="Poster URL (optional)"
+                />
+                <div className="flex gap-2 justify-end">
+                  <button
+                    onClick={() => {
+                      setIsAddingMovie(false)
+                      setNewMovieTitle('')
+                      setNewMovieDescription('')
+                      setNewMoviePoster('')
+                    }}
+                    className="text-slate-400 hover:text-white transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleAddMovie}
+                    className="text-green-400 hover:text-green-300 transition-colors"
+                  >
+                    Add
+                  </button>
+                </div>
+              </div>
+            )}
             {(movies.length ? movies.slice(0, 5) : []).map(movie => (
               <div key={movie.movie_id}>
                 {editingId === movie.movie_id ? (
