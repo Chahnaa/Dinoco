@@ -5,6 +5,7 @@ import { FaChartLine, FaSearch, FaStar, FaUserFriends } from "react-icons/fa";
 import { getMovies } from "../api/api";
 import { getWatchlistIds, subscribeWatchlist } from "../utils/watchlist";
 import MovieCard from "../components/MovieCard";
+import Recommendations from "../components/Recommendations";
 
 const SearchIcon = FaSearch as unknown as React.ComponentType<{ className?: string }>;
 const UsersIcon = FaUserFriends as unknown as React.ComponentType<{ className?: string }>;
@@ -235,6 +236,13 @@ const Home: React.FC = () => {
           ))}
         </div>
       </section>
+
+      {/* Recommendations Section */}
+      {localStorage.getItem("token") && (
+        <section className="w-full">
+          <Recommendations />
+        </section>
+      )}
 
       <section className="glass flex w-full flex-col gap-4 rounded-3xl border border-slate-800/60 p-5" id="movies">
         <div className="flex w-full flex-wrap items-center justify-between gap-4">

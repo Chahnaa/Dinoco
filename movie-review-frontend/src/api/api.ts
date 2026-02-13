@@ -48,5 +48,6 @@ export const addReview = (review: any) => apiClient.post(`/reviews`, review);
 
 export const getStats = () => apiClient.get(`/stats`);
 export const getAdminAnalytics = () => apiClient.get(`/admin/analytics`);
+export const getRecommendations = () => apiClient.get(`/recommendations`);
 
 export default axios;

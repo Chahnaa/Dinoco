@@ -776,6 +776,130 @@ def get_user_reviews():
             conn.close()
 
 
+@app.route("/api/recommendations", methods=["GET"])
+@require_auth
+def get_recommendations():
+    """
+    Rule-based recommendation engine.
+    
+    Algorithm:
+    1. Analyze user's review history (genres watched, ratings given)
+    2. Find preferred genres (genres with avg rating >= 4)
+    3. Recommend unwatched movies from preferred genres
+    4. Fallback to trending movies (most reviewed + high rated)
+    5. Return top 10 recommendations
+    """
+    user_id = request.user.get("user_id")
+    conn = None
+    try:
+        conn = get_db()
+        cursor = conn.cursor(dictionary=True)
+        
+        # Step 1: Get user's review history with genre preferences
+        cursor.execute("""
+            SELECT m.genre, AVG(r.rating) as avg_rating, COUNT(*) as watch_count
+            FROM reviews r
+            JOIN movies m ON r.movie_id = m.movie_id
+            WHERE r.user_id = %s AND m.genre IS NOT NULL
+            GROUP BY m.genre
+            HAVING AVG(r.rating) >= 4.0
+            ORDER BY avg_rating DESC, watch_count DESC
+        """, (user_id,))
+        preferred_genres = cursor.fetchall()
+        
+        # Step 2: Get movies user has already reviewed (to exclude)
+        cursor.execute("""
+            SELECT movie_id FROM reviews WHERE user_id = %s
+        """, (user_id,))
+        watched_movie_ids = [row['movie_id'] for row in cursor.fetchall()]
+        
+        recommendations = []
+        
+        # Step 3: Recommend from preferred genres (genre-based filtering)
+        if preferred_genres:
+            genre_list = [g['genre'] for g in preferred_genres[:3]]  # Top 3 genres
+            placeholders = ','.join(['%s'] * len(genre_list))
+            exclude_placeholders = ','.join(['%s'] * len(watched_movie_ids)) if watched_movie_ids else '0'
+            
+            query = f"""
+                SELECT m.*, 
+                       COALESCE(AVG(r.rating), 0) as avg_rating,
+                       COUNT(r.review_id) as review_count
+                FROM movies m
+                LEFT JOIN reviews r ON m.movie_id = r.movie_id
+                WHERE m.genre IN ({placeholders})
+                  AND m.movie_id NOT IN ({exclude_placeholders})
+                GROUP BY m.movie_id
+                ORDER BY avg_rating DESC, review_count DESC
+                LIMIT 10
+            """
+            cursor.execute(query, genre_list + watched_movie_ids)
+            recommendations = cursor.fetchall()
+        
+        # Step 4: Fallback to trending movies if not enough genre recommendations
+        if len(recommendations) < 10:
+            exclude_placeholders = ','.join(['%s'] * len(watched_movie_ids)) if watched_movie_ids else '0'
+            
+            cursor.execute(f"""
+                SELECT m.*,
+                       AVG(r.rating) as avg_rating,
+                       COUNT(r.review_id) as review_count
+                FROM movies m
+                INNER JOIN reviews r ON m.movie_id = r.movie_id
+                WHERE m.movie_id NOT IN ({exclude_placeholders})
+                GROUP BY m.movie_id
+                HAVING COUNT(r.review_id) >= 3 AND AVG(r.rating) >= 4.0
+                ORDER BY review_count DESC, avg_rating DESC
+                LIMIT %s
+            """, watched_movie_ids + [10 - len(recommendations)])
+            
+            trending = cursor.fetchall()
+            recommendations.extend(trending)
+        
+        # Step 5: If still not enough, recommend highest-rated movies
+        if len(recommendations) < 10:
+            exclude_all = list(set([r['movie_id'] for r in recommendations] + watched_movie_ids))
+            exclude_placeholders = ','.join(['%s'] * len(exclude_all)) if exclude_all else '0'
+            
+            cursor.execute(f"""
+                SELECT m.*,
+                       COALESCE(AVG(r.rating), 0) as avg_rating,
+                       COUNT(r.review_id) as review_count
+                FROM movies m
+                LEFT JOIN reviews r ON m.movie_id = r.movie_id
+                WHERE m.movie_id NOT IN ({exclude_placeholders})
+                GROUP BY m.movie_id
+                ORDER BY avg_rating DESC, m.release_year DESC
+                LIMIT %s
+            """, exclude_all + [10 - len(recommendations)])
+            
+            remaining = cursor.fetchall()
+            recommendations.extend(remaining)
+        
+        # Add recommendation reason for each movie
+        for movie in recommendations:
+            if preferred_genres and movie.get('genre') in [g['genre'] for g in preferred_genres]:
+                movie['recommendation_reason'] = f"Based on your love for {movie['genre']}"
+            elif movie.get('review_count', 0) >= 5:
+                movie['recommendation_reason'] = "Trending now"
+            else:
+                movie['recommendation_reason'] = "Highly rated"
+        
+        return jsonify({
+            "recommendations": recommendations[:10],
+            "preferred_genres": [g['genre'] for g in preferred_genres],
+            "algorithm": "rule-based",
+            "user_watch_count": len(watched_movie_ids)
+        })
+        
+    except mysql.connector.Error as e:
+        logger.exception("Failed to generate recommendations for user_id=%s", user_id)
+        return jsonify({"message": "Internal server error"}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
 if __name__ == "__main__":
     # Register a generic error handler to log unexpected exceptions
     @app.errorhandler(Exception)
