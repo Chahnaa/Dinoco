@@ -11,6 +11,8 @@ type Stats = {
 type Movie = {
   movie_id: number
   title: string
+  description?: string
+  poster_url?: string
 }
 
 const FilmIcon = FaFilm as unknown as React.ComponentType<{ className?: string }>
@@ -20,6 +22,9 @@ const ChartIcon = FaChartBar as unknown as React.ComponentType<{ className?: str
 const AdminDashboard: React.FC = () => {
   const [stats, setStats] = useState<Stats | null>(null)
   const [movies, setMovies] = useState<Movie[]>([])
+  const [editingId, setEditingId] = useState<number | null>(null)
+  const [editTitle, setEditTitle] = useState('')
+  const [editDescription, setEditDescription] = useState('')
 
   const loadMovies = () => {
     getMovies()
@@ -45,6 +50,18 @@ const AdminDashboard: React.FC = () => {
     } catch (error) {
       alert('Failed to delete movie')
     }
+  }
+
+  const handleEditClick = (movie: Movie) => {
+    setEditingId(movie.movie_id)
+    setEditTitle(movie.title)
+    setEditDescription(movie.description || '')
+  }
+
+  const handleEditCancel = () => {
+    setEditingId(null)
+    setEditTitle('')
+    setEditDescription('')
   }
 
   return (
@@ -83,17 +100,57 @@ const AdminDashboard: React.FC = () => {
           </div>
           <div className="mt-4 space-y-3 text-xs text-slate-300">
             {(movies.length ? movies.slice(0, 5) : []).map(movie => (
-              <div key={movie.movie_id} className="flex items-center justify-between rounded-xl border border-slate-800/60 px-3 py-3">
-                <span>{movie.title}</span>
-                <div className="flex gap-2">
-                  <button className="text-red-300">Edit</button>
-                  <button 
-                    onClick={() => handleDeleteMovie(movie.movie_id)}
-                    className="text-slate-500 hover:text-red-400 transition-colors"
-                  >
-                    Delete
-                  </button>
-                </div>
+              <div key={movie.movie_id}>
+                {editingId === movie.movie_id ? (
+                  <div className="rounded-xl border border-slate-800/60 px-3 py-3 space-y-2">
+                    <input
+                      type="text"
+                      value={editTitle}
+                      onChange={(e) => setEditTitle(e.target.value)}
+                      className="w-full bg-slate-800/50 rounded px-2 py-1 text-white text-xs"
+                      placeholder="Movie title"
+                    />
+                    <textarea
+                      value={editDescription}
+                      onChange={(e) => setEditDescription(e.target.value)}
+                      className="w-full bg-slate-800/50 rounded px-2 py-1 text-white text-xs"
+                      placeholder="Description"
+                      rows={2}
+                    />
+                    <div className="flex gap-2 justify-end">
+                      <button
+                        onClick={handleEditCancel}
+                        className="text-slate-400 hover:text-white"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={() => alert('Save functionality coming soon')}
+                        className="text-green-400 hover:text-green-300"
+                      >
+                        Save
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between rounded-xl border border-slate-800/60 px-3 py-3">
+                    <span>{movie.title}</span>
+                    <div className="flex gap-2">
+                      <button 
+                        onClick={() => handleEditClick(movie)}
+                        className="text-red-300 hover:text-red-200 transition-colors"
+                      >
+                        Edit
+                      </button>
+                      <button 
+                        onClick={() => handleDeleteMovie(movie.movie_id)}
+                        className="text-slate-500 hover:text-red-400 transition-colors"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
             {!movies.length && (
