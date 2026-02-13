@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { FaChartBar, FaFilm, FaUsers } from 'react-icons/fa'
-import { getMovies, getStats, deleteMovie } from '../api/api'
+import { getMovies, getStats, deleteMovie, editMovie } from '../api/api'
 
 type Stats = {
   total_movies: number
@@ -64,6 +64,19 @@ const AdminDashboard: React.FC = () => {
     setEditDescription('')
   }
 
+  const handleEditSave = async (movieId: number) => {
+    try {
+      await editMovie(movieId, {
+        title: editTitle,
+        description: editDescription
+      })
+      loadMovies()
+      handleEditCancel()
+    } catch (error) {
+      alert('Failed to update movie')
+    }
+  }
+
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-8">
       <div className="space-y-2">
@@ -120,20 +133,20 @@ const AdminDashboard: React.FC = () => {
                     <div className="flex gap-2 justify-end">
                       <button
                         onClick={handleEditCancel}
-                        className="text-slate-400 hover:text-white"
+                        className="text-slate-400 hover:text-white transition-colors"
                       >
                         Cancel
                       </button>
                       <button
-                        onClick={() => alert('Save functionality coming soon')}
-                        className="text-green-400 hover:text-green-300"
+                        onClick={() => handleEditSave(movie.movie_id)}
+                        className="text-green-400 hover:text-green-300 transition-colors"
                       >
                         Save
                       </button>
                     </div>
                   </div>
                 ) : (
-                  <div className="flex items-center justify-between rounded-xl border border-slate-800/60 px-3 py-3">
+                  <div className="flex items-center justify-between px-3 py-3">
                     <span>{movie.title}</span>
                     <div className="flex gap-2">
                       <button 
@@ -154,7 +167,7 @@ const AdminDashboard: React.FC = () => {
               </div>
             ))}
             {!movies.length && (
-              <div className="rounded-xl border border-slate-800/60 px-3 py-3 text-slate-400">
+              <div className="px-3 py-3 text-slate-400">
                 No movies available.
               </div>
             )}
