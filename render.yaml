@@ -31,11 +31,14 @@ services:
       - key: SMTP_USE_TLS
         sync: false
 
-  - type: static_site
+  - type: web
     name: movie-review-frontend
+    runtime: node
+    region: oregon
+    plan: free
     rootDir: movie-review-frontend
     buildCommand: npm install && npm run build
-    staticPublishPath: build
+    startCommand: npx serve -s build -l $PORT
     envVars:
       - key: REACT_APP_API_URL
         sync: false
