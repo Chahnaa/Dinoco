@@ -381,6 +381,7 @@ def get_movie(id):
 
 
 @app.route("/api/movies", methods=["POST"])
+@require_auth
 @require_role('admin')
 def add_movie():
     data = request.json or {}
@@ -417,6 +418,7 @@ def add_movie():
 
 
 @app.route("/api/movies/<int:id>", methods=["PUT"])
+@require_auth
 @require_role('admin')
 def update_movie(id):
     data = request.json or {}
@@ -453,6 +455,7 @@ def update_movie(id):
 
 
 @app.route("/api/movies/<int:id>", methods=["DELETE"])
+@require_auth
 @require_role('admin')
 def delete_movie(id):
     conn = None
