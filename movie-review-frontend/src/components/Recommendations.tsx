@@ -112,10 +112,6 @@ const Recommendations: React.FC = () => {
       <div className="space-y-2">
         <div className="flex items-center gap-3">
           <h2 className="text-2xl font-bold text-white">Recommended For You</h2>
-          <span className="px-3 py-1 bg-gradient-to-r from-purple-600 to-blue-600 text-white text-xs font-semibold rounded-full flex items-center gap-1">
-            <span>🧠</span>
-            <span>EXPLAINABLE AI</span>
-          </span>
         </div>
         {data.preferred_genres.length > 0 && (
           <p className="text-sm text-slate-400">
@@ -236,9 +232,8 @@ const Recommendations: React.FC = () => {
           <div className="text-3xl">🧠</div>
           <div className="flex-1 space-y-3">
             <div>
-              <h3 className="text-base font-bold text-white mb-1 flex items-center gap-2">
-                <span>Explainable AI (XAI) System</span>
-                <span className="px-2 py-0.5 bg-purple-600 text-[10px] rounded-full">INNOVATIVE</span>
+              <h3 className="text-base font-bold text-white mb-1">
+                Explainable AI (XAI) System
               </h3>
               <p className="text-sm text-slate-300">
                 Our recommendation engine doesn't just suggest movies—it explains <strong>why</strong> each movie was recommended.

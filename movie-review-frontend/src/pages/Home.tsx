@@ -6,6 +6,7 @@ import { getMovies } from "../api/api";
 import { getWatchlistIds, subscribeWatchlist } from "../utils/watchlist";
 import MovieCard from "../components/MovieCard";
 import Recommendations from "../components/Recommendations";
+import MovieNightPlanner from "../components/MovieNightPlanner";
 
 const SearchIcon = FaSearch as unknown as React.ComponentType<{ className?: string }>;
 const UsersIcon = FaUserFriends as unknown as React.ComponentType<{ className?: string }>;
@@ -130,6 +131,11 @@ const Home: React.FC = () => {
             </div>
           </motion.div>
         </div>
+      </section>
+
+      {/* Movie Night Planner - INNOVATIVE FEATURE */}
+      <section className="w-full">
+        <MovieNightPlanner />
       </section>
 
       {watchlistMovies.length > 0 && (
