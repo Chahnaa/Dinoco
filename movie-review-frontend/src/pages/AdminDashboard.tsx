@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { FaChartBar, FaFilm, FaUsers } from 'react-icons/fa'
-import { getMovies, getStats } from '../api/api'
+import { getMovies, getStats, deleteMovie } from '../api/api'
 
 type Stats = {
   total_movies: number
@@ -21,14 +21,31 @@ const AdminDashboard: React.FC = () => {
   const [stats, setStats] = useState<Stats | null>(null)
   const [movies, setMovies] = useState<Movie[]>([])
 
+  const loadMovies = () => {
+    getMovies()
+      .then(res => setMovies(res.data))
+      .catch(() => setMovies([]))
+  }
+
   useEffect(() => {
     getStats()
       .then(res => setStats(res.data))
       .catch(() => setStats(null))
-    getMovies()
-      .then(res => setMovies(res.data))
-      .catch(() => setMovies([]))
+    loadMovies()
   }, [])
+
+  const handleDeleteMovie = async (movieId: number) => {
+    if (!window.confirm('Are you sure you want to delete this movie?')) return
+    try {
+      await deleteMovie(movieId)
+      loadMovies()
+      getStats()
+        .then(res => setStats(res.data))
+        .catch(() => setStats(null))
+    } catch (error) {
+      alert('Failed to delete movie')
+    }
+  }
 
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-8">
@@ -70,7 +87,12 @@ const AdminDashboard: React.FC = () => {
                 <span>{movie.title}</span>
                 <div className="flex gap-2">
                   <button className="text-red-300">Edit</button>
-                  <button className="text-slate-500">Delete</button>
+                  <button 
+                    onClick={() => handleDeleteMovie(movie.movie_id)}
+                    className="text-slate-500 hover:text-red-400 transition-colors"
+                  >
+                    Delete
+                  </button>
                 </div>
               </div>
             ))}
