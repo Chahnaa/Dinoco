@@ -1,10 +1,12 @@
 import React from "react";
 import { motion } from "framer-motion";
-import { FaFilm } from "react-icons/fa";
+import { FaFilm, FaChevronLeft, FaChevronRight } from "react-icons/fa";
 import MovieCard from "../components/MovieCard";
 import { getMovies } from "../api/api";
 
 const FilmIcon = FaFilm as unknown as React.ComponentType<{ className?: string }>;
+const ChevronLeftIcon = FaChevronLeft as unknown as React.ComponentType<{ className?: string }>;
+const ChevronRightIcon = FaChevronRight as unknown as React.ComponentType<{ className?: string }>;
 
 type Movie = {
   movie_id: number;
@@ -25,6 +27,9 @@ const BrowseMovies: React.FC = () => {
   const [search, setSearch] = React.useState("");
   const [genre, setGenre] = React.useState("All");
   const [minRating, setMinRating] = React.useState("All");
+  const [sortBy, setSortBy] = React.useState("newest");
+  const [currentPage, setCurrentPage] = React.useState(1);
+  const itemsPerPage = 6;
 
   React.useEffect(() => {
     setLoading(true);
@@ -39,22 +44,47 @@ const BrowseMovies: React.FC = () => {
     return ["All", ...Array.from(values)];
   }, [movies]);
 
+  const years = React.useMemo(() => {
+    const values = new Set(movies.map(movie => movie.release_year).filter(Boolean) as number[]);
+    return ["All", ...Array.from(values).sort((a, b) => b - a)];
+  }, [movies]);
+
   const filteredMovies = React.useMemo(() => {
-    return movies.filter(movie => {
+    let result = movies.filter(movie => {
       const matchesSearch = movie.title.toLowerCase().includes(search.toLowerCase());
       const matchesGenre = genre === "All" || movie.genre === genre;
       const ratingValue = movie.avg_rating ? Number(movie.avg_rating) : 0;
       const matchesRating = minRating === "All" || ratingValue >= Number(minRating);
       return matchesSearch && matchesGenre && matchesRating;
     });
-  }, [movies, search, genre, minRating]);
 
-  const suggestions = React.useMemo(() => {
-    if (!search.trim()) return [] as Movie[];
-    return movies
-      .filter(movie => movie.title.toLowerCase().includes(search.toLowerCase()))
-      .slice(0, 5);
-  }, [movies, search]);
+    // Sort
+    if (sortBy === "rating-high") {
+      result.sort((a, b) => (b.avg_rating || 0) - (a.avg_rating || 0));
+    } else if (sortBy === "rating-low") {
+      result.sort((a, b) => (a.avg_rating || 0) - (b.avg_rating || 0));
+    } else if (sortBy === "newest") {
+      result.sort((a, b) => (b.release_year || 0) - (a.release_year || 0));
+    } else if (sortBy === "oldest") {
+      result.sort((a, b) => (a.release_year || 0) - (b.release_year || 0));
+    } else if (sortBy === "title-asc") {
+      result.sort((a, b) => a.title.localeCompare(b.title));
+    } else if (sortBy === "title-desc") {
+      result.sort((a, b) => b.title.localeCompare(a.title));
+    }
+
+    return result;
+  }, [movies, search, genre, minRating, sortBy]);
+
+  const totalPages = Math.ceil(filteredMovies.length / itemsPerPage);
+  const paginatedMovies = React.useMemo(() => {
+    const startIdx = (currentPage - 1) * itemsPerPage;
+    return filteredMovies.slice(startIdx, startIdx + itemsPerPage);
+  }, [filteredMovies, currentPage]);
+
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [search, genre, minRating, sortBy]);
 
   return (
     <div className="relative left-1/2 right-1/2 w-screen -ml-[50vw] -mr-[50vw] bg-gradient-to-b from-red-950/60 via-[#050505] to-black py-8">
@@ -77,7 +107,7 @@ const BrowseMovies: React.FC = () => {
       </motion.div>
 
       <div className="glass rounded-2xl border border-slate-800/60 p-4">
-        <div className="grid gap-3 md:grid-cols-[1.2fr_0.6fr_0.6fr] md:items-end">
+        <div className="grid gap-3 md:grid-cols-[1.2fr_0.6fr_0.6fr_0.6fr] md:items-end">
           <div className="relative">
             <label className="text-[10px] uppercase tracking-[0.2em] text-slate-400">Search</label>
             <input
@@ -86,21 +116,6 @@ const BrowseMovies: React.FC = () => {
               placeholder="Search titles..."
               className="mt-2 w-full rounded-xl border border-slate-700/70 bg-slate-950/40 px-3 py-2 text-sm text-white outline-none focus:border-red-400/60"
             />
-            {suggestions.length > 0 && (
-              <div className="absolute left-0 right-0 top-full z-20 mt-2 overflow-hidden rounded-xl border border-slate-800/80 bg-slate-950/95 shadow-lg">
-                {suggestions.map(movie => (
-                  <button
-                    key={movie.movie_id}
-                    type="button"
-                    onClick={() => setSearch(movie.title)}
-                    className="flex w-full items-center justify-between px-3 py-2 text-left text-xs text-slate-200 hover:bg-slate-900/80"
-                  >
-                    <span>{movie.title}</span>
-                    <span className="text-[10px] text-slate-500">{movie.release_year || ""}</span>
-                  </button>
-                ))}
-              </div>
-            )}
           </div>
           <div>
             <label className="text-[10px] uppercase tracking-[0.2em] text-slate-400">Genre</label>
@@ -117,7 +132,7 @@ const BrowseMovies: React.FC = () => {
             </select>
           </div>
           <div>
-            <label className="text-[10px] uppercase tracking-[0.2em] text-slate-400">Minimum Rating</label>
+            <label className="text-[10px] uppercase tracking-[0.2em] text-slate-400">Min Rating</label>
             <select
               value={minRating}
               onChange={e => setMinRating(e.target.value)}
@@ -127,6 +142,21 @@ const BrowseMovies: React.FC = () => {
               <option value="4" className="bg-slate-950">4.0+</option>
               <option value="3" className="bg-slate-950">3.0+</option>
               <option value="2" className="bg-slate-950">2.0+</option>
+            </select>
+          </div>
+          <div>
+            <label className="text-[10px] uppercase tracking-[0.2em] text-slate-400">Sort By</label>
+            <select
+              value={sortBy}
+              onChange={e => setSortBy(e.target.value)}
+              className="mt-2 w-full rounded-xl border border-slate-700/70 bg-slate-950/40 px-3 py-2 text-sm text-white outline-none focus:border-red-400/60"
+            >
+              <option value="newest" className="bg-slate-950">Newest</option>
+              <option value="oldest" className="bg-slate-950">Oldest</option>
+              <option value="rating-high" className="bg-slate-950">Rating: High</option>
+              <option value="rating-low" className="bg-slate-950">Rating: Low</option>
+              <option value="title-asc" className="bg-slate-950">Title: A-Z</option>
+              <option value="title-desc" className="bg-slate-950">Title: Z-A</option>
             </select>
           </div>
         </div>
@@ -143,11 +173,63 @@ const BrowseMovies: React.FC = () => {
           No movies found.
         </div>
       ) : (
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {filteredMovies.map(movie => (
-            <MovieCard key={movie.movie_id} movie={movie} />
-          ))}
-        </div>
+        <>
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-slate-400">
+              Showing {(currentPage - 1) * itemsPerPage + 1}-{Math.min(currentPage * itemsPerPage, filteredMovies.length)} of {filteredMovies.length} movies
+            </p>
+          </div>
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {paginatedMovies.map(movie => (
+              <MovieCard key={movie.movie_id} movie={movie} />
+            ))}
+          </div>
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-4">
+              <button
+                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1}
+                className="flex items-center gap-2 rounded-lg border border-slate-700/60 px-4 py-2 text-sm text-slate-300 disabled:opacity-50 disabled:cursor-not-allowed hover:border-red-400/60 hover:text-red-300 transition-colors"
+              >
+                <ChevronLeftIcon className="h-4 w-4" />
+                Previous
+              </button>
+              <div className="flex items-center gap-2">
+                {Array.from({ length: totalPages }).map((_, idx) => {
+                  const pageNum = idx + 1;
+                  const isCurrentPage = pageNum === currentPage;
+                  const isVisible = Math.abs(pageNum - currentPage) <= 1 || pageNum === 1 || pageNum === totalPages;
+                  
+                  return isVisible ? (
+                    <button
+                      key={pageNum}
+                      onClick={() => setCurrentPage(pageNum)}
+                      className={`w-8 h-8 rounded-lg text-xs font-semibold transition-colors ${
+                        isCurrentPage
+                          ? 'bg-red-600/80 text-white'
+                          : 'border border-slate-700/60 text-slate-300 hover:border-red-400/60 hover:text-red-300'
+                      }`}
+                    >
+                      {pageNum}
+                    </button>
+                  ) : pageNum === 2 && currentPage > 3 ? (
+                    <span key="dots-start" className="text-slate-500">...</span>
+                  ) : pageNum === totalPages - 1 && currentPage < totalPages - 2 ? (
+                    <span key="dots-end" className="text-slate-500">...</span>
+                  ) : null;
+                })}
+              </div>
+              <button
+                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                disabled={currentPage === totalPages}
+                className="flex items-center gap-2 rounded-lg border border-slate-700/60 px-4 py-2 text-sm text-slate-300 disabled:opacity-50 disabled:cursor-not-allowed hover:border-red-400/60 hover:text-red-300 transition-colors"
+              >
+                Next
+                <ChevronRightIcon className="h-4 w-4" />
+              </button>
+            </div>
+          )}
+        </>
       )}
       </div>
     </div>
