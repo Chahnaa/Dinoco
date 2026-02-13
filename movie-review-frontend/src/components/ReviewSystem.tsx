@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from "react";
-import { FaStar, FaUser } from "react-icons/fa";
 import axios from "axios";
 
 interface Review {
@@ -225,7 +224,7 @@ const ReviewSystem: React.FC<ReviewSystemProps> = ({ movieId, onReviewSubmitted 
                       : "text-gray-600"
                   }`}
                 >
-                  <FaStar />
+                  ★
                 </span>
               ))}
             </div>
@@ -270,11 +269,13 @@ const ReviewSystem: React.FC<ReviewSystemProps> = ({ movieId, onReviewSubmitted 
                   onMouseLeave={() => setHoveredRating(0)}
                   className="transition-transform hover:scale-110"
                 >
-                  <FaStar
-                    className={`${
+                  <span
+                    className={`text-3xl ${
                       star <= (hoveredRating || rating) ? "text-yellow-400" : "text-gray-600"
                     } transition-colors`}
-                  />
+                  >
+                    ★
+                  </span>
                 </button>
               ))}
             </div>
@@ -344,7 +345,7 @@ const ReviewSystem: React.FC<ReviewSystemProps> = ({ movieId, onReviewSubmitted 
               <div className="flex items-start justify-between gap-4">
                 <div className="flex gap-3 flex-1">
                   <div className="flex-shrink-0 w-10 h-10 bg-gradient-to-br from-blue-400 to-purple-400 rounded-full flex items-center justify-center">
-                    <FaUser className="text-slate-900" />
+                    <span className="text-slate-900 text-lg">👤</span>
                   </div>
 
                   <div className="flex-1 min-w-0">
@@ -358,7 +359,7 @@ const ReviewSystem: React.FC<ReviewSystemProps> = ({ movieId, onReviewSubmitted 
                               i < review.rating ? "text-yellow-400" : "text-gray-600"
                             }`}
                           >
-                            <FaStar />
+                            ★
                           </span>
                         ))}
                       </div>
