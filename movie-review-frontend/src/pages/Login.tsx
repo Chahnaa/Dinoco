@@ -40,6 +40,7 @@ const Login: React.FC = () => {
     verifyLoginOtp({ email: otpEmail, code: otpCode })
       .then(res => {
         localStorage.setItem('user', JSON.stringify(res.data.user))
+        localStorage.setItem('token', res.data.token)
         navigate('/account')
       })
       .catch((error) => {

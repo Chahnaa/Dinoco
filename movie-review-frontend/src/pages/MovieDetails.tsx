@@ -1,16 +1,19 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { FaArrowLeft, FaStar } from "react-icons/fa";
+import { FaArrowLeft, FaBookmark, FaRegBookmark, FaStar } from "react-icons/fa";
 import { getReviews, addReview, getMovieDetails } from "../api/api";
 import ReviewCard from "../components/ReviewCard";
 import AudienceMoodMeter from "../components/AudienceMoodMeter";
 import ReviewSummary from "../components/ReviewSummary";
 import RatingTimeline, { RatingPoint } from "../components/RatingTimeline";
 import MovieBadges from "../components/MovieBadges";
+import { isWatchlisted, subscribeWatchlist, toggleWatchlistId } from "../utils/watchlist";
 
 const ArrowLeftIcon = FaArrowLeft as unknown as React.ComponentType<{ className?: string }>;
 const StarIcon = FaStar as unknown as React.ComponentType<{ className?: string }>;
+const BookmarkIcon = FaBookmark as unknown as React.ComponentType<{ className?: string }>;
+const BookmarkOutlineIcon = FaRegBookmark as unknown as React.ComponentType<{ className?: string }>;
 
 interface Review {
   review_id: number;
@@ -29,6 +32,7 @@ const MovieDetails: React.FC = () => {
   const [reactionsByReview, setReactionsByReview] = useState<Record<number, Record<string, number>>>({});
   const [movie, setMovie] = useState<{ title?: string; genre?: string; language?: string; release_year?: number; avg_rating?: number; review_count?: number; duration_minutes?: number; poster_url?: string; description?: string } | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isSaved, setIsSaved] = useState(false);
   const maxCommentLength = 400;
 
   useEffect(() => {
@@ -42,6 +46,13 @@ const MovieDetails: React.FC = () => {
       setMovie(movieRes.data);
       setLoading(false);
     });
+  }, [id]);
+
+  useEffect(() => {
+    if (!id) return;
+    const movieId = Number(id);
+    setIsSaved(isWatchlisted(movieId));
+    return subscribeWatchlist((ids) => setIsSaved(ids.includes(movieId)));
   }, [id]);
 
   const submitReview = () => {
@@ -205,9 +216,30 @@ const MovieDetails: React.FC = () => {
             <p className="text-sm text-slate-300">
                 {movie?.description || "An atmospheric journey through neon-lit streets where every choice reshapes the story. Drop your review and let the community decide the ending."}
             </p>
-            <button className="btn-primary">
-              Add Review
-            </button>
+            <div className="flex flex-wrap gap-3">
+              <button className="btn-primary">
+                Add Review
+              </button>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => {
+                  if (!id) return;
+                  const next = toggleWatchlistId(Number(id));
+                  setIsSaved(next.includes(Number(id)));
+                }}
+              >
+                {isSaved ? (
+                  <span className="flex items-center gap-2">
+                    <BookmarkIcon className="text-red-400" /> Saved
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-2">
+                    <BookmarkOutlineIcon /> Watchlist
+                  </span>
+                )}
+              </button>
+            </div>
           </div>
 
           <div className="glass rounded-2xl p-4">

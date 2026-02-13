@@ -2,20 +2,47 @@ import axios from "axios";
 
 const API_URL = "http://127.0.0.1:5002/api";
 
-export const getMovies = () => axios.get(`${API_URL}/movies`);
-export const getMovieDetails = (id: number) => axios.get(`${API_URL}/movies/${id}`);
-export const addMovie = (movie: any) => axios.post(`${API_URL}/movies`, movie);
-export const editMovie = (id: number, movie: any) => axios.put(`${API_URL}/movies/${id}`, movie);
-export const deleteMovie = (id: number) => axios.delete(`${API_URL}/movies/${id}`);
+// Create axios instance with auth headers
+const apiClient = axios.create({
+  baseURL: API_URL,
+});
 
-export const registerUser = (user: any) => axios.post(`${API_URL}/register`, user);
-export const loginUser = (user: any) => axios.post(`${API_URL}/login`, user);
+// Add token to requests
+apiClient.interceptors.request.use((config) => {
+  const token = localStorage.getItem("token");
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
+// Handle 401 errors
+apiClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem("user");
+      localStorage.removeItem("token");
+      window.location.href = "/login";
+    }
+    return Promise.reject(error);
+  }
+);
+
+export const getMovies = () => apiClient.get(`/movies`);
+export const getMovieDetails = (id: number) => apiClient.get(`/movies/${id}`);
+export const addMovie = (movie: any) => apiClient.post(`/movies`, movie);
+export const editMovie = (id: number, movie: any) => apiClient.put(`/movies/${id}`, movie);
+export const deleteMovie = (id: number) => apiClient.delete(`/movies/${id}`);
+
+export const registerUser = (user: any) => apiClient.post(`/register`, user);
+export const loginUser = (user: any) => apiClient.post(`/login`, user);
 export const verifyLoginOtp = (payload: { email: string; code: string }) =>
-	axios.post(`${API_URL}/login/verify-otp`, payload);
+  apiClient.post(`/login/verify-otp`, payload);
 
-export const getReviews = (movie_id: number) => axios.get(`${API_URL}/reviews/movie/${movie_id}`);
-export const addReview = (review: any) => axios.post(`${API_URL}/reviews`, review);
+export const getReviews = (movie_id: number) => apiClient.get(`/reviews/movie/${movie_id}`);
+export const addReview = (review: any) => apiClient.post(`/reviews`, review);
 
-export const getStats = () => axios.get(`${API_URL}/stats`);
+export const getStats = () => apiClient.get(`/stats`);
 
 export default axios;

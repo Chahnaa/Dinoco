@@ -1,8 +1,11 @@
 import React from "react";
 import { motion } from "framer-motion";
-import { FaStar } from "react-icons/fa";
+import { FaBookmark, FaRegBookmark, FaStar } from "react-icons/fa";
+import { isWatchlisted, subscribeWatchlist, toggleWatchlistId } from "../utils/watchlist";
 
 const StarIcon = FaStar as unknown as React.ComponentType<{ className?: string }>;
+const BookmarkIcon = FaBookmark as unknown as React.ComponentType<{ className?: string }>;
+const BookmarkOutlineIcon = FaRegBookmark as unknown as React.ComponentType<{ className?: string }>;
 
 interface Movie {
   movie_id: number;
@@ -21,6 +24,7 @@ const MovieCard: React.FC<{ movie: Movie }> = ({ movie }) => {
   const rating = movie.avg_rating;
   const ratingValue = typeof rating === "number" ? rating : Number(rating);
   const movieId = movie.movie_id ?? (movie as { id?: number }).id;
+  const [isSaved, setIsSaved] = React.useState(false);
   
   // Use local poster paths directly; proxy only external URLs to avoid CORS issues
   const posterUrl = movie.poster_url
@@ -46,6 +50,12 @@ const MovieCard: React.FC<{ movie: Movie }> = ({ movie }) => {
     setImgSrc(initialPoster);
   }, [initialPoster]);
 
+  React.useEffect(() => {
+    if (!movieId) return;
+    setIsSaved(isWatchlisted(movieId));
+    return subscribeWatchlist((ids) => setIsSaved(ids.includes(movieId)));
+  }, [movieId]);
+
     return (
     <motion.div
       whileHover={{ y: -8, rotateX: 2, rotateY: -2 }}
@@ -63,6 +73,20 @@ const MovieCard: React.FC<{ movie: Movie }> = ({ movie }) => {
             onError={() => setImgSrc(svgPoster)}
           />
         </div>
+        <button
+          type="button"
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            if (!movieId) return;
+            const next = toggleWatchlistId(movieId);
+            setIsSaved(next.includes(movieId));
+          }}
+          className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-full border border-slate-700/70 bg-slate-950/80 text-slate-200 transition hover:border-red-400/60 hover:text-white"
+          aria-label={isSaved ? "Remove from watchlist" : "Add to watchlist"}
+        >
+          {isSaved ? <BookmarkIcon className="text-red-400" /> : <BookmarkOutlineIcon />}
+        </button>
         <div className="pointer-events-none absolute inset-0 opacity-0 transition duration-300 group-hover:opacity-100">
           <div className="absolute -inset-10 bg-gradient-to-tr from-red-500/15 via-transparent to-purple-500/10" />
         </div>

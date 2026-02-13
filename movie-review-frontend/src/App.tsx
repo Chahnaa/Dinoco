@@ -3,6 +3,7 @@ import './App.css';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import Header from './components/Header'
 import Footer from './components/Footer'
+import PrivateRoute from './components/PrivateRoute'
 import Home from './pages/Home'
 import MovieDetails from './pages/MovieDetails'
 import Login from './pages/Login'
@@ -22,9 +23,9 @@ const App: React.FC = () => {
             <Route path="/browse" element={<BrowseMovies />} />
             <Route path="/movie/:id" element={<MovieDetails />} />
             <Route path="/login" element={<Login />} />
-            <Route path="/account" element={<Account />} />
-            <Route path="/settings" element={<Settings />} />
-            <Route path="/admin" element={<AdminDashboard />} />
+            <Route path="/account" element={<PrivateRoute><Account /></PrivateRoute>} />
+            <Route path="/settings" element={<PrivateRoute><Settings /></PrivateRoute>} />
+            <Route path="/admin" element={<PrivateRoute requiredRole="admin"><AdminDashboard /></PrivateRoute>} />
           </Routes>
         </main>
         <Footer />

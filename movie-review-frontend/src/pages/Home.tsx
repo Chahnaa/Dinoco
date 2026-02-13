@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { FaChartLine, FaSearch, FaStar, FaUserFriends } from "react-icons/fa";
 import { getMovies } from "../api/api";
+import { getWatchlistIds, subscribeWatchlist } from "../utils/watchlist";
 import MovieCard from "../components/MovieCard";
 
 const SearchIcon = FaSearch as unknown as React.ComponentType<{ className?: string }>;
@@ -29,6 +30,7 @@ const Home: React.FC = () => {
   const [search, setSearch] = useState("");
   const [genre, setGenre] = useState("All");
   const [showFilters, setShowFilters] = useState(false);
+  const [watchlistIds, setWatchlistIds] = useState<number[]>([]);
 
   useEffect(() => {
     setLoading(true);
@@ -36,6 +38,11 @@ const Home: React.FC = () => {
       .then(res => setMovies(res.data))
       .catch(() => setMovies([]))
       .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => {
+    setWatchlistIds(getWatchlistIds());
+    return subscribeWatchlist(setWatchlistIds);
   }, []);
 
   const genres = useMemo(() => {
@@ -53,6 +60,10 @@ const Home: React.FC = () => {
 
   const topMovies = useMemo(() => filteredMovies.slice(0, 3), [filteredMovies])
   const trendingMovies = useMemo(() => filteredMovies.slice(0, 8), [filteredMovies])
+  const watchlistMovies = useMemo(
+    () => movies.filter(movie => watchlistIds.includes(movie.movie_id)).slice(0, 6),
+    [movies, watchlistIds]
+  )
 
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-10">
@@ -173,6 +184,23 @@ const Home: React.FC = () => {
           <p className="text-xs text-slate-400">Audience sentiment score</p>
         </div>
       </section>
+
+      {watchlistMovies.length > 0 && (
+        <section className="glass flex w-full flex-col gap-4 rounded-3xl border border-slate-800/60 p-5">
+          <div className="flex w-full flex-wrap items-center justify-between gap-4">
+            <div>
+              <h2 className="text-xl font-semibold text-white">Your Watchlist</h2>
+              <p className="text-xs text-slate-400">Quick access to the movies you saved.</p>
+            </div>
+            <Link className="text-xs text-slate-300 hover:text-white" to="/browse">Browse more</Link>
+          </div>
+          <div className="grid w-full gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {watchlistMovies.map(movie => (
+              <MovieCard key={movie.movie_id} movie={movie} />
+            ))}
+          </div>
+        </section>
+      )}
 
       <section className="glass flex w-full flex-col gap-4 rounded-3xl border border-slate-800/60 p-5" id="trending">
         <div className="flex w-full flex-wrap items-center justify-between gap-4">

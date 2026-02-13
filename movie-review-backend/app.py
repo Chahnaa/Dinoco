@@ -9,6 +9,8 @@ from datetime import datetime, timedelta
 import secrets
 import smtplib
 from email.message import EmailMessage
+from functools import wraps
+import jwt
 
 load_dotenv()
 
@@ -29,7 +31,64 @@ DB_CONFIG = {
 }
 
 app = Flask(__name__)
+app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'your-secret-key-change-in-production')
 CORS(app)
+
+
+def create_jwt_token(user_id, email, role):
+    """Create a JWT token for authenticated users."""
+    payload = {
+        'user_id': user_id,
+        'email': email,
+        'role': role,
+        'exp': datetime.utcnow() + timedelta(days=7)
+    }
+    return jwt.encode(payload, app.config['SECRET_KEY'], algorithm='HS256')
+
+def verify_jwt_token(token):
+    """Verify JWT token and return payload if valid."""
+    try:
+        payload = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
+        return payload
+    except jwt.ExpiredSignatureError:
+        return None
+    except jwt.InvalidTokenError:
+        return None
+
+def require_auth(f):
+    """Decorator to require authentication."""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        token = None
+        auth_header = request.headers.get('Authorization')
+        if auth_header:
+            try:
+                token = auth_header.split(' ')[1]
+            except IndexError:
+                return jsonify({'message': 'Invalid token format'}), 401
+        
+        if not token:
+            return jsonify({'message': 'Token required'}), 401
+        
+        payload = verify_jwt_token(token)
+        if not payload:
+            return jsonify({'message': 'Invalid or expired token'}), 401
+        
+        request.user = payload
+        return f(*args, **kwargs)
+    return decorated
+
+def require_role(*roles):
+    """Decorator to require specific roles."""
+    def decorator(f):
+        @wraps(f)
+        @require_auth
+        def decorated(*args, **kwargs):
+            if request.user.get('role') not in roles:
+                return jsonify({'message': 'Insufficient permissions'}), 403
+            return f(*args, **kwargs)
+        return decorated
+    return decorator
 
 
 def ensure_movie_schema():
@@ -99,6 +158,9 @@ def send_otp_email(to_email, code):
     smtp_from = os.getenv("SMTP_FROM", smtp_user or "no-reply@dinoco.local")
     use_tls = os.getenv("SMTP_USE_TLS", "true").lower() == "true"
 
+    # Always log the OTP code for debugging
+    logger.warning("🔐 OTP CODE FOR %s: %s", to_email, code)
+
     if not smtp_host or not smtp_user or not smtp_pass:
         logger.warning("SMTP not configured. OTP for %s: %s", to_email, code)
         return False
@@ -111,12 +173,17 @@ def send_otp_email(to_email, code):
         f"Your Dinoco verification code is {code}. It expires in 10 minutes."
     )
 
-    with smtplib.SMTP(smtp_host, smtp_port) as server:
-        if use_tls:
-            server.starttls()
-        server.login(smtp_user, smtp_pass)
-        server.send_message(msg)
-    return True
+    try:
+        with smtplib.SMTP(smtp_host, smtp_port) as server:
+            if use_tls:
+                server.starttls()
+            server.login(smtp_user, smtp_pass)
+            server.send_message(msg)
+        logger.info("Email sent successfully to %s", to_email)
+        return True
+    except Exception as e:
+        logger.error("Failed to send email to %s: %s", to_email, str(e))
+        return False
 
 
 def issue_login_otp(user_id, email):
@@ -201,8 +268,9 @@ def login():
                 "otp_required": True,
                 "email": user["email"],
             }
-            if dev_code:
-                payload["dev_otp"] = dev_code
+            # Always return dev_otp in development
+            if os.getenv("FLASK_ENV") == "development" or dev_code:
+                payload["dev_otp"] = dev_code if dev_code else "Check console"
             return jsonify(payload)
         return jsonify({"message": "Invalid credentials"}), 401
     except mysql.connector.Error:
@@ -245,8 +313,10 @@ def verify_login_otp():
         cursor.execute("UPDATE login_otps SET consumed=1 WHERE otp_id=%s", (otp["otp_id"],))
         conn.commit()
 
+        # Create JWT token
+        token = create_jwt_token(user["user_id"], user["email"], user["role"])
         user.pop("password", None)
-        return jsonify({"message": "Login successful", "user": user})
+        return jsonify({"message": "Login successful", "user": user, "token": token})
     except mysql.connector.Error:
         logger.exception("Database error during OTP verify for %s", email)
         return jsonify({"message": "Internal server error"}), 500
@@ -311,6 +381,7 @@ def get_movie(id):
 
 
 @app.route("/api/movies", methods=["POST"])
+@require_role('admin')
 def add_movie():
     data = request.json or {}
     title = data.get("title")
@@ -346,6 +417,7 @@ def add_movie():
 
 
 @app.route("/api/movies/<int:id>", methods=["PUT"])
+@require_role('admin')
 def update_movie(id):
     data = request.json or {}
     conn = None
@@ -381,6 +453,7 @@ def update_movie(id):
 
 
 @app.route("/api/movies/<int:id>", methods=["DELETE"])
+@require_role('admin')
 def delete_movie(id):
     conn = None
     try:
