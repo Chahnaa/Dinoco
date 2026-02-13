@@ -31,6 +31,8 @@ CREATE TABLE IF NOT EXISTS reviews (
     rating INT CHECK (rating >= 1 AND rating <= 5),
     comment TEXT,
     review_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY unique_user_movie_review (user_id, movie_id),
     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE SET NULL,
     FOREIGN KEY (movie_id) REFERENCES movies(movie_id) ON DELETE CASCADE
 );

@@ -474,20 +474,66 @@ def delete_movie(id):
 
 
 @app.route("/api/reviews", methods=["POST"])
+@require_auth
 def add_review():
+    """Create or update a review. One review per user per movie."""
     data = request.json or {}
+    user_id = request.user.get("user_id")
+    movie_id = data.get("movie_id")
+    rating = data.get("rating")
+    comment = data.get("comment", "")
+    
+    if not all([user_id, movie_id, rating]):
+        return jsonify({"message": "user_id, movie_id, and rating required"}), 400
+    
+    try:
+        rating = int(rating)
+        if rating < 1 or rating > 5:
+            return jsonify({"message": "rating must be between 1 and 5"}), 400
+    except (ValueError, TypeError):
+        return jsonify({"message": "rating must be a number"}), 400
+    
     conn = None
     try:
         conn = get_db()
-        cursor = conn.cursor()
+        cursor = conn.cursor(dictionary=True)
+        
+        # Check if movie exists
+        cursor.execute("SELECT movie_id FROM movies WHERE movie_id=%s", (movie_id,))
+        if not cursor.fetchone():
+            return jsonify({"message": "Movie not found"}), 404
+        
+        # Check if user already reviewed this movie
         cursor.execute(
-            "INSERT INTO reviews (user_id, movie_id, rating, comment) VALUES (%s,%s,%s,%s)",
-            (data.get("user_id"), data.get("movie_id"), data.get("rating"), data.get("comment")),
+            "SELECT review_id FROM reviews WHERE user_id=%s AND movie_id=%s",
+            (user_id, movie_id)
         )
+        existing_review = cursor.fetchone()
+        
+        if existing_review:
+            # Update existing review
+            cursor.execute(
+                "UPDATE reviews SET rating=%s, comment=%s, review_date=NOW() WHERE user_id=%s AND movie_id=%s",
+                (rating, comment, user_id, movie_id)
+            )
+        else:
+            # Create new review
+            cursor.execute(
+                "INSERT INTO reviews (user_id, movie_id, rating, comment) VALUES (%s,%s,%s,%s)",
+                (user_id, movie_id, rating, comment)
+            )
+        
         conn.commit()
-        return jsonify({"message": "Review added successfully"}), 201
-    except mysql.connector.Error:
-        logger.exception("Failed to add review: %s", data)
+        
+        return jsonify({
+            "message": "Review updated successfully" if existing_review else "Review added successfully",
+            "user_id": user_id,
+            "movie_id": movie_id,
+            "rating": rating
+        }), 200 if existing_review else 201
+        
+    except mysql.connector.Error as e:
+        logger.exception("Failed to add/update review: %s", str(e))
         return jsonify({"message": "Internal server error"}), 500
     finally:
         if conn:
@@ -528,13 +574,74 @@ def get_movie_reviews(movie_id):
         conn = get_db()
         cursor = conn.cursor(dictionary=True)
         cursor.execute(
-            "SELECT r.*, u.name FROM reviews r JOIN users u ON r.user_id=u.user_id WHERE movie_id=%s",
+            "SELECT r.*, u.name FROM reviews r JOIN users u ON r.user_id=u.user_id WHERE movie_id=%s ORDER BY r.review_date DESC",
             (movie_id,),
         )
         reviews = cursor.fetchall()
         return jsonify(reviews)
     except mysql.connector.Error:
         logger.exception("Failed to fetch reviews for movie_id=%s", movie_id)
+        return jsonify({"message": "Internal server error"}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
+@app.route("/api/reviews/movie/<int:movie_id>/user/<int:user_id>", methods=["GET"])
+def get_user_review_for_movie(movie_id, user_id):
+    """Get a specific user's review for a movie."""
+    conn = None
+    try:
+        conn = get_db()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute(
+            "SELECT * FROM reviews WHERE movie_id=%s AND user_id=%s",
+            (movie_id, user_id)
+        )
+        review = cursor.fetchone()
+        return jsonify(review) if review else jsonify({"message": "Review not found"}), (200 if review else 404)
+    except mysql.connector.Error:
+        logger.exception("Failed to fetch review for movie_id=%s, user_id=%s", movie_id, user_id)
+        return jsonify({"message": "Internal server error"}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
+@app.route("/api/reviews/movie/<int:movie_id>/stats", methods=["GET"])
+def get_movie_rating_stats(movie_id):
+    """Get aggregated rating statistics for a movie."""
+    conn = None
+    try:
+        conn = get_db()
+        cursor = conn.cursor(dictionary=True)
+        
+        # Get average rating and review count
+        cursor.execute(
+            """
+            SELECT 
+                COUNT(*) as review_count,
+                AVG(rating) as avg_rating,
+                MIN(rating) as min_rating,
+                MAX(rating) as max_rating,
+                ROUND(AVG(rating), 1) as avg_rating_rounded
+            FROM reviews 
+            WHERE movie_id=%s
+            """,
+            (movie_id,)
+        )
+        stats = cursor.fetchone()
+        
+        # Return proper response even if no reviews
+        return jsonify({
+            "review_count": stats["review_count"] or 0,
+            "avg_rating": float(stats["avg_rating"]) if stats["avg_rating"] else 0,
+            "avg_rating_rounded": float(stats["avg_rating_rounded"]) if stats["avg_rating_rounded"] else 0,
+            "min_rating": stats["min_rating"],
+            "max_rating": stats["max_rating"]
+        })
+    except mysql.connector.Error as err:
+        logger.exception("Failed to fetch rating stats for movie_id=%s", movie_id)
         return jsonify({"message": "Internal server error"}), 500
     finally:
         if conn:

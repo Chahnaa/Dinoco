@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { FaArrowLeft, FaBookmark, FaRegBookmark, FaStar } from "react-icons/fa";
 import { getReviews, addReview, getMovieDetails } from "../api/api";
 import ReviewCard from "../components/ReviewCard";
+import ReviewSystem from "../components/ReviewSystem";
 import AudienceMoodMeter from "../components/AudienceMoodMeter";
 import ReviewSummary from "../components/ReviewSummary";
 import RatingTimeline, { RatingPoint } from "../components/RatingTimeline";
@@ -270,93 +271,16 @@ const MovieDetails: React.FC = () => {
         </div>
       </section>
 
-      <section className="grid gap-8 lg:grid-cols-[0.65fr_0.35fr]">
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-white">Reviews</h2>
-            <span className="text-xs text-slate-400">{reviews.length} total</span>
-          </div>
-          <ReviewSummary reviews={reviews.map(review => review.comment || "").filter(Boolean)} />
-          {loading ? (
-            <div className="space-y-4">
-              {Array.from({ length: 3 }).map((_, index) => (
-                <div key={index} className="h-28 animate-pulse rounded-2xl bg-slate-900/60" />
-              ))}
-            </div>
-          ) : reviews.length === 0 ? (
-            <div className="glass rounded-2xl p-6 text-sm text-slate-300">
-              No reviews yet. Be the first to review!
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {reviews.map(r => (
-                <ReviewCard
-                  key={r.review_id}
-                  review={r}
-                  reactions={reactionsByReview[r.review_id] || {}}
-                  onReact={(emoji) => handleReaction(r.review_id, emoji)}
-                  isTop={topReviewId === r.review_id}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div className="space-y-6">
-          <RatingTimeline points={ratingTimeline} />
-          <AudienceMoodMeter
-            totalVotes={reviews.length}
-            moodCounts={moodCounts}
-            selectedMood={selectedMood ?? undefined}
-            onSelectMood={handleMoodSelect}
+      <section className="space-y-6">
+        <h2 className="text-2xl font-semibold text-white">Reviews & Ratings</h2>
+        {!loading && id && (
+          <ReviewSystem 
+            movieId={Number(id)} 
+            onReviewSubmitted={() => {
+              getReviews(Number(id)).then(res => setReviews(res.data));
+            }}
           />
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-            className="glass rounded-2xl p-4"
-          >
-            <h3 className="text-sm font-semibold text-white">Write your review</h3>
-            <p className="text-xs text-slate-400">Share your verdict with the community.</p>
-            <div className="mt-4 space-y-3">
-              <div>
-                <p className="text-xs font-semibold text-slate-300">Your rating</p>
-                <div className="mt-2 flex items-center gap-2">
-                  {[1, 2, 3, 4, 5].map(star => (
-                    <button
-                      key={star}
-                      type="button"
-                      onClick={() => setNewRating(star)}
-                      className={`text-lg ${star <= newRating ? "text-yellow-400" : "text-slate-600"}`}
-                    >
-                      <StarIcon />
-                    </button>
-                  ))}
-                  <span className="text-xs text-slate-400">{newRating}/5</span>
-                </div>
-              </div>
-              <div>
-                <p className="text-xs font-semibold text-slate-300">Your review</p>
-                <textarea
-                  value={newComment}
-                  onChange={e => setNewComment(e.target.value.slice(0, maxCommentLength))}
-                  className="mt-2 h-28 w-full rounded-xl border border-slate-700/60 bg-slate-950/40 p-3 text-sm text-white outline-none"
-                  placeholder="Share your thoughts..."
-                />
-                <p className="mt-1 text-right text-[10px] text-slate-500">
-                  {newComment.length}/{maxCommentLength}
-                </p>
-              </div>
-              <button
-                onClick={submitReview}
-                disabled={!newComment.trim()}
-                className="w-full rounded-xl bg-red-500 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-white disabled:opacity-50"
-              >
-                Submit Review
-              </button>
-            </div>
-          </motion.div>
-        </div>
+        )}
       </section>
     </div>
   );

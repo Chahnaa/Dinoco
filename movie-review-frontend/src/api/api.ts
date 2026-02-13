@@ -41,6 +41,9 @@ export const verifyLoginOtp = (payload: { email: string; code: string }) =>
   apiClient.post(`/login/verify-otp`, payload);
 
 export const getReviews = (movie_id: number) => apiClient.get(`/reviews/movie/${movie_id}`);
+export const getMovieReviewStats = (movie_id: number) => apiClient.get(`/reviews/movie/${movie_id}/stats`);
+export const getUserReviewForMovie = (movie_id: number, user_id: number) => apiClient.get(`/reviews/movie/${movie_id}/user/${user_id}`);
+export const getUserReviews = () => apiClient.get(`/reviews/user`);
 export const addReview = (review: any) => apiClient.post(`/reviews`, review);
 
 export const getStats = () => apiClient.get(`/stats`);
