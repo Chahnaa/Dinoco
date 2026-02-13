@@ -648,6 +648,29 @@ def get_movie_rating_stats(movie_id):
             conn.close()
 
 
+@app.route("/api/reviews/user", methods=["GET"])
+@require_auth
+def get_user_reviews():
+    """Get all reviews by the authenticated user."""
+    user_id = request.user.get("user_id")
+    conn = None
+    try:
+        conn = get_db()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute(
+            "SELECT r.*, m.title FROM reviews r JOIN movies m ON r.movie_id=m.movie_id WHERE r.user_id=%s ORDER BY r.review_date DESC",
+            (user_id,)
+        )
+        reviews = cursor.fetchall()
+        return jsonify(reviews)
+    except mysql.connector.Error:
+        logger.exception("Failed to fetch reviews for user_id=%s", user_id)
+        return jsonify({"message": "Internal server error"}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
 if __name__ == "__main__":
     # Register a generic error handler to log unexpected exceptions
     @app.errorhandler(Exception)
