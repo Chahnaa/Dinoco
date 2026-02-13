@@ -34,7 +34,6 @@ services:
   - type: web
     name: movie-review-frontend
     runtime: static
-    region: oregon
     plan: free
     rootDir: movie-review-frontend
     buildCommand: npm install && npm run build
