@@ -2,6 +2,7 @@ import React from "react";
 import { motion } from "framer-motion";
 import { FaBookmark, FaRegBookmark, FaStar } from "react-icons/fa";
 import { isWatchlisted, subscribeWatchlist, toggleWatchlistId } from "../utils/watchlist";
+import TrustHeatmap from "./TrustHeatmap";
 
 const StarIcon = FaStar as unknown as React.ComponentType<{ className?: string }>;
 const BookmarkIcon = FaBookmark as unknown as React.ComponentType<{ className?: string }>;
@@ -97,9 +98,12 @@ const MovieCard: React.FC<{ movie: Movie }> = ({ movie }) => {
         <div className="absolute right-4 top-4 rounded-full bg-red-500/20 px-3 py-1 text-[10px] uppercase tracking-[0.2em] text-red-200">
           Spotlight
         </div>
-        <div className="absolute bottom-4 left-4 flex items-center gap-2 text-sm text-white">
-          <StarIcon className="text-yellow-400" />
-          <span>{Number.isFinite(ratingValue) && ratingValue > 0 ? ratingValue.toFixed(1) : "New"}</span>
+        <div className="absolute bottom-4 left-4 right-4 flex flex-col gap-2 text-sm text-white">
+          <div className="flex items-center gap-2">
+            <StarIcon className="text-yellow-400" />
+            <span>{Number.isFinite(ratingValue) && ratingValue > 0 ? ratingValue.toFixed(1) : "New"}</span>
+          </div>
+          {movieId && <TrustHeatmap movieId={movieId} />}
         </div>
       </div>
       <div className="space-y-3 p-4">

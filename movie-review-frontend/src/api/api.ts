@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const API_URL = "http://127.0.0.1:5002/api";
+const API_URL = process.env.REACT_APP_API_URL || "http://127.0.0.1:5002/api";
 
 // Create axios instance with auth headers
 const apiClient = axios.create({

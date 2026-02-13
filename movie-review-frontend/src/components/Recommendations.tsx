@@ -229,7 +229,6 @@ const Recommendations: React.FC = () => {
       {/* Explainable AI Info Panel - THEORY MARKS */}
       <div className="glass rounded-xl p-5 border border-purple-500/20">
         <div className="flex items-start gap-3">
-          <div className="text-3xl">🧠</div>
           <div className="flex-1 space-y-3">
             <div>
               <h3 className="text-base font-bold text-white mb-1">

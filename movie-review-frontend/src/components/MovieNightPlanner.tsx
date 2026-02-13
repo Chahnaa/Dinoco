@@ -111,7 +111,7 @@ const MovieNightPlanner: React.FC = () => {
         {/* Header */}
         <div>
           <div className="flex items-center gap-3 mb-2">
-            <h2 className="text-2xl font-bold text-white">🍿 Movie Night Planner</h2>
+            <h2 className="text-2xl font-bold text-white">Movie Night Planner</h2>
           </div>
           <p className="text-sm text-slate-400">
             Tell us your preferences and we'll plan the perfect movie night!

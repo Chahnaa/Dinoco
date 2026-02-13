@@ -137,6 +137,40 @@ def ensure_auth_schema():
     finally:
         if conn:
             conn.close()
+
+def ensure_decision_trace_schema():
+    conn = None
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS decision_traces (
+                trace_id INT AUTO_INCREMENT PRIMARY KEY,
+                user_id INT,
+                movie_id INT NOT NULL,
+                trace_path JSON NOT NULL,
+                trace_summary VARCHAR(255),
+                decision_source ENUM('search', 'filter', 'trending', 'recommendation', 'browse', 'direct') DEFAULT 'browse',
+                num_steps INT,
+                time_spent_seconds INT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                INDEX (user_id),
+                INDEX (movie_id),
+                INDEX (decision_source),
+                INDEX (created_at),
+                FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE SET NULL,
+                FOREIGN KEY (movie_id) REFERENCES movies(movie_id) ON DELETE CASCADE
+            )
+            """
+        )
+        conn.commit()
+    except mysql.connector.Error:
+        logger.exception("Failed to migrate decision_traces schema")
+    finally:
+        if conn:
+            conn.close()
+
 def get_db():
     try:
         conn = mysql.connector.connect(**DB_CONFIG)
@@ -148,6 +182,7 @@ def get_db():
 
 ensure_movie_schema()
 ensure_auth_schema()
+ensure_decision_trace_schema()
 
 
 def send_otp_email(to_email, code):
@@ -940,6 +975,455 @@ if __name__ == "__main__":
     def handle_exception(e):
         logger.exception("Unhandled exception: %s", e)
         return jsonify({"message": "Internal server error"}), 500
+
+@app.route("/api/trust-heatmap/<int:movie_id>", methods=["GET"])
+def get_trust_heatmap(movie_id):
+    """Get trust heatmap data: rating consistency and reviewer credibility"""
+    conn = None
+    try:
+        conn = get_db()
+        cursor = conn.cursor(dictionary=True)
+        
+        # Get all reviews for this movie
+        cursor.execute(
+            """
+            SELECT r.rating, r.user_id, u.username, COUNT(ur.review_id) as user_review_count
+            FROM reviews r
+            JOIN users u ON r.user_id = u.user_id
+            LEFT JOIN reviews ur ON u.user_id = ur.user_id
+            WHERE r.movie_id = %s
+            GROUP BY r.review_id, r.user_id
+            ORDER BY r.review_date DESC
+            """,
+            (movie_id,)
+        )
+        
+        reviews = cursor.fetchall()
+        
+        if not reviews:
+            return jsonify({
+                "rating_consistency": 0,
+                "reviewer_credibility": 0,
+                "trust_score": 0,
+                "review_count": 0,
+                "average_rating": 0
+            }), 200
+        
+        ratings = [float(r['rating']) for r in reviews]
+        
+        # 1. CONSISTENCY: Calculate standard deviation and convert to 0-100 score
+        # Lower std dev = higher consistency
+        import statistics
+        avg_rating = statistics.mean(ratings)
+        if len(ratings) > 1:
+            std_dev = statistics.stdev(ratings)
+            # Max reasonable std dev is ~2 (full range), convert to 0-100
+            consistency = max(0, 100 - (std_dev * 25))
+        else:
+            consistency = 100  # Single review = perfect consistency
+        
+        # 2. CREDIBILITY: Based on reviewer activity and rating patterns
+        # Reviewers with more reviews are more credible
+        credibility_scores = []
+        for review in reviews:
+            review_count = review['user_review_count']
+            # More reviews = higher credibility (1-10 reviews = 40-100 points)
+            activity_score = min(100, 30 + (review_count * 7))
+            
+            # Rating proximity to average (within 0.5 = better)
+            deviation = abs(float(review['rating']) - avg_rating)
+            proximity_score = max(0, 100 - (deviation * 40))
+            
+            # Combined credibility
+            credibility = (activity_score * 0.6) + (proximity_score * 0.4)
+            credibility_scores.append(credibility)
+        
+        avg_credibility = statistics.mean(credibility_scores) if credibility_scores else 0
+        
+        # 3. TRUST SCORE: Weighted average
+        trust_score = (consistency * 0.4) + (avg_credibility * 0.6)
+        
+        return jsonify({
+            "rating_consistency": round(consistency, 1),
+            "reviewer_credibility": round(avg_credibility, 1),
+            "trust_score": round(trust_score, 1),
+            "review_count": len(reviews),
+            "average_rating": round(avg_rating, 2),
+            "rating_distribution": {
+                "min": min(ratings),
+                "max": max(ratings),
+                "std_dev": round(statistics.stdev(ratings), 2) if len(ratings) > 1 else 0
+            }
+        }), 200
+        
+    except Exception as e:
+        logger.exception("Failed to get trust heatmap for movie_id=%s: %s", movie_id, e)
+        return jsonify({"message": "Internal server error"}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
+@app.route("/api/decision-trace", methods=["POST"])
+def record_decision_trace():
+    """Record a decision trace: how user navigated to a movie"""
+    import json as json_lib
+    try:
+        data = request.get_json()
+        user_id = data.get("user_id")
+        movie_id = data.get("movie_id")
+        trace_path = data.get("trace_path", [])  # List of steps
+        decision_source = data.get("decision_source", "browse")  # search, filter, trending, recommendation, browse, direct
+        time_spent = data.get("time_spent_seconds", 0)
+        
+        if not movie_id or not trace_path:
+            return jsonify({"message": "Missing required fields"}), 400
+        
+        conn = get_db()
+        cursor = conn.cursor()
+        
+        # Generate human-readable trace summary
+        trace_summary = " → ".join(trace_path[:5])  # First 5 steps
+        
+        cursor.execute(
+            """
+            INSERT INTO decision_traces 
+            (user_id, movie_id, trace_path, trace_summary, decision_source, num_steps, time_spent_seconds)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """,
+            (user_id, movie_id, json_lib.dumps(trace_path), trace_summary, 
+             decision_source, len(trace_path), time_spent)
+        )
+        conn.commit()
+        trace_id = cursor.lastrowid
+        conn.close()
+        
+        logger.info(f"Recorded decision trace {trace_id} for movie {movie_id} via {decision_source}")
+        return jsonify({
+            "trace_id": trace_id,
+            "trace_summary": trace_summary,
+            "decision_source": decision_source
+        }), 201
+        
+    except Exception as e:
+        logger.exception("Failed to record decision trace: %s", e)
+        return jsonify({"message": "Internal server error"}), 500
+
+
+@app.route("/api/decision-trace/<int:movie_id>", methods=["GET"])
+def get_movie_decision_traces(movie_id):
+    """Get all decision traces for a movie with analytics"""
+    import json as json_lib
+    try:
+        conn = get_db()
+        cursor = conn.cursor(dictionary=True)
+        
+        # Get all traces for this movie
+        cursor.execute(
+            """
+            SELECT trace_id, user_id, trace_path, trace_summary, decision_source, 
+                   num_steps, time_spent_seconds, created_at
+            FROM decision_traces
+            WHERE movie_id = %s
+            ORDER BY created_at DESC
+            LIMIT 100
+            """,
+            (movie_id,)
+        )
+        
+        traces = cursor.fetchall()
+        
+        # Parse JSON paths and aggregate analytics
+        parsed_traces = []
+        decision_sources = {}
+        avg_steps = 0
+        
+        for trace in traces:
+            trace['trace_path'] = json_lib.loads(trace['trace_path'])
+            parsed_traces.append(trace)
+            
+            source = trace['decision_source']
+            decision_sources[source] = decision_sources.get(source, 0) + 1
+            avg_steps += trace['num_steps']
+        
+        avg_steps = avg_steps / len(traces) if traces else 0
+        
+        # Find most common decision path
+        path_frequencies = {}
+        for trace in parsed_traces:
+            path_key = " → ".join(trace['trace_path'][:4])
+            path_frequencies[path_key] = path_frequencies.get(path_key, 0) + 1
+        
+        most_common_path = max(path_frequencies, key=path_frequencies.get) if path_frequencies else None
+        
+        conn.close()
+        
+        return jsonify({
+            "total_traces": len(traces),
+            "traces": parsed_traces[:10],  # Return latest 10
+            "analytics": {
+                "decision_sources": decision_sources,
+                "average_steps": round(avg_steps, 1),
+                "most_common_path": most_common_path,
+                "path_distribution": path_frequencies
+            }
+        }), 200
+        
+    except Exception as e:
+        logger.exception("Failed to get decision traces for movie %s: %s", movie_id, e)
+        return jsonify({"message": "Internal server error"}), 500
+
+
+@app.route("/api/user/decision-traces", methods=["GET"])
+@require_auth
+def get_user_decision_traces():
+    """Get user's decision traces for behavioral analysis"""
+    try:
+        user_id = request.user.get('user_id')
+        limit = request.args.get('limit', 20, type=int)
+        
+        conn = get_db()
+        cursor = conn.cursor(dictionary=True)
+        
+        cursor.execute(
+            """
+            SELECT dt.trace_id, dt.movie_id, m.title, dt.trace_path, dt.trace_summary, 
+                   dt.decision_source, dt.num_steps, dt.time_spent_seconds, dt.created_at
+            FROM decision_traces dt
+            JOIN movies m ON dt.movie_id = m.movie_id
+            WHERE dt.user_id = %s
+            ORDER BY dt.created_at DESC
+            LIMIT %s
+            """,
+            (user_id, limit)
+        )
+        
+        traces = cursor.fetchall()
+        
+        # Parse JSON and generate analytics
+        import json as json_lib
+        parsed_traces = []
+        decision_behavior = {
+            'search': 0, 'filter': 0, 'trending': 0, 
+            'recommendation': 0, 'browse': 0, 'direct': 0
+        }
+        avg_steps_taken = 0
+        
+        for trace in traces:
+            trace['trace_path'] = json_lib.loads(trace['trace_path'])
+            parsed_traces.append(trace)
+            decision_behavior[trace['decision_source']] += 1
+            avg_steps_taken += trace['num_steps']
+        
+        avg_steps_taken = avg_steps_taken / len(traces) if traces else 0
+        
+        # Identify user's preferred decision method
+        preferred_source = max(decision_behavior, key=decision_behavior.get)
+        
+        conn.close()
+        
+        return jsonify({
+            "traces": parsed_traces,
+            "user_behavior": {
+                "total_traces": len(traces),
+                "decision_methods": decision_behavior,
+                "preferred_method": preferred_source,
+                "average_decision_steps": round(avg_steps_taken, 1)
+            }
+        }), 200
+        
+    except Exception as e:
+        logger.exception("Failed to get user decision traces: %s", e)
+        return jsonify({"message": "Internal server error"}), 500
+
+
+@app.route("/api/explain-algorithm/<int:movie_id>", methods=["GET"])
+def explain_algorithm(movie_id):
+    """Explain why a movie is being shown - transparency in recommendations"""
+    try:
+        user_id = None
+        auth_header = request.headers.get('Authorization')
+        if auth_header:
+            try:
+                token = auth_header.split(' ')[1]
+                payload = verify_jwt_token(token)
+                if payload:
+                    user_id = payload.get('user_id')
+            except:
+                pass
+        
+        conn = get_db()
+        cursor = conn.cursor(dictionary=True)
+        
+        # Get movie details
+        cursor.execute(
+            "SELECT title, genre, avg_rating, review_count FROM movies WHERE movie_id = %s",
+            (movie_id,)
+        )
+        movie = cursor.fetchone()
+        
+        if not movie:
+            conn.close()
+            return jsonify({"message": "Movie not found"}), 404
+        
+        explanation = {
+            "movie": {
+                "id": movie_id,
+                "title": movie['title'],
+                "genre": movie['genre'],
+                "rating": float(movie['avg_rating']) if movie['avg_rating'] else 0,
+                "review_count": movie['review_count']
+            },
+            "factors": {
+                "personalization": [],
+                "filters": [],
+                "popularity": [],
+                "trending": []
+            },
+            "scores": {
+                "personalization_score": 0,
+                "filter_match_score": 0,
+                "popularity_score": 0,
+                "overall_score": 0
+            }
+        }
+        
+        # 1. PERSONALIZATION FACTORS (if user logged in)
+        if user_id:
+            cursor.execute(
+                """
+                SELECT r.rating, m.genre FROM reviews r
+                JOIN movies m ON r.movie_id = m.movie_id
+                WHERE r.user_id = %s AND r.rating >= 4.0
+                ORDER BY r.review_date DESC LIMIT 10
+                """,
+                (user_id,)
+            )
+            liked_movies = cursor.fetchall()
+            
+            if liked_movies:
+                genre_matches = sum(1 for m in liked_movies if m['genre'] == movie['genre'])
+                personalization_score = (genre_matches / len(liked_movies) * 100)
+                
+                if genre_matches > 0:
+                    explanation["factors"]["personalization"].append({
+                        "reason": "Genre Match",
+                        "description": f"You rated {genre_matches} {movie['genre']} movies highly",
+                        "weight": "40%",
+                        "emoji": "🎬"
+                    })
+                
+                explanation["scores"]["personalization_score"] = round(personalization_score, 1)
+        
+        # 2. FILTER MATCHING
+        filter_matches = []
+        
+        if movie['avg_rating'] >= 4.5:
+            filter_matches.append({
+                "filter": "High Rated",
+                "criteria": "Rating ≥ 4.5⭐",
+                "met": True,
+                "value": f"{movie['avg_rating']:.1f}⭐",
+                "emoji": "⭐"
+            })
+        
+        if movie['avg_rating'] >= 4.0:
+            filter_matches.append({
+                "filter": "Quality Threshold",
+                "criteria": "Rating ≥ 4.0⭐",
+                "met": True,
+                "value": f"{movie['avg_rating']:.1f}⭐",
+                "emoji": "✅"
+            })
+        
+        if movie['review_count'] >= 50:
+            filter_matches.append({
+                "filter": "Community Consensus",
+                "criteria": "≥50 verified reviews",
+                "met": True,
+                "value": f"{movie['review_count']} reviews",
+                "emoji": "👥"
+            })
+        
+        explanation["factors"]["filters"] = filter_matches
+        filter_score = (len(filter_matches) / 3 * 100) if filter_matches else 0
+        explanation["scores"]["filter_match_score"] = round(filter_score, 1)
+        
+        # 3. POPULARITY METRICS
+        cursor.execute(
+            "SELECT COUNT(*) as total FROM movies WHERE avg_rating <= %s",
+            (movie['avg_rating'],)
+        )
+        total_movies = cursor.fetchone()['total']
+        cursor.execute("SELECT COUNT(*) as count FROM movies")
+        all_movies_count = cursor.fetchone()['count']
+        
+        percentile = (total_movies / all_movies_count * 100) if all_movies_count > 0 else 0
+        
+        explanation["factors"]["popularity"] = [
+            {
+                "metric": "Rating Percentile",
+                "value": f"Top {100 - percentile:.0f}%",
+                "description": f"Higher rated than {percentile:.0f}% of movies",
+                "emoji": "📊"
+            },
+            {
+                "metric": "Review Volume",
+                "value": f"{movie['review_count']} reviews",
+                "description": "Indicator of community engagement",
+                "emoji": "💬"
+            },
+            {
+                "metric": "Average Rating",
+                "value": f"{movie['avg_rating']:.1f}/5.0",
+                "description": "Community consensus score",
+                "emoji": "⭐"
+            }
+        ]
+        
+        popularity_score = (percentile + (min(movie['review_count'], 100) / 100 * 50)) / 2
+        explanation["scores"]["popularity_score"] = round(popularity_score, 1)
+        
+        # 4. TRENDING INDICATORS
+        cursor.execute(
+            """
+            SELECT COUNT(*) as recent_reviews FROM reviews
+            WHERE movie_id = %s AND review_date >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+            """,
+            (movie_id,)
+        )
+        recent_reviews = cursor.fetchone()['recent_reviews']
+        
+        if recent_reviews > 5:
+            explanation["factors"]["trending"].append({
+                "indicator": "Recent Activity",
+                "value": f"{recent_reviews} reviews in last 7 days",
+                "emoji": "📈"
+            })
+        
+        # 5. OVERALL SCORE
+        overall_score = (
+            (explanation["scores"]["personalization_score"] * 0.4) +
+            (explanation["scores"]["filter_match_score"] * 0.3) +
+            (explanation["scores"]["popularity_score"] * 0.3)
+        )
+        explanation["scores"]["overall_score"] = round(overall_score, 1)
+        
+        explanation["summary"] = (
+            f"This movie is shown because it scores {overall_score:.0f}/100 based on "
+            f"popularity ({explanation['scores']['popularity_score']:.0f}%), "
+            f"quality filters ({explanation['scores']['filter_match_score']:.0f}%), "
+            f"and " + ("your preferences" if user_id and explanation["scores"]["personalization_score"] > 0 else "recommendations") + "."
+        )
+        
+        conn.close()
+        
+        return jsonify(explanation), 200
+        
+    except Exception as e:
+        logger.exception("Failed to explain algorithm for movie %s: %s", movie_id, e)
+        return jsonify({"message": "Internal server error"}), 500
+
 
 @app.route("/api/proxy-image", methods=["GET"])
 def proxy_image():

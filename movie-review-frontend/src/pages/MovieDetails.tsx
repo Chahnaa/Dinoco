@@ -9,6 +9,7 @@ import AudienceMoodMeter from "../components/AudienceMoodMeter";
 import ReviewSummary from "../components/ReviewSummary";
 import RatingTimeline, { RatingPoint } from "../components/RatingTimeline";
 import MovieBadges from "../components/MovieBadges";
+import ThrillPulse from "../components/ThrillPulse";
 import { isWatchlisted, subscribeWatchlist, toggleWatchlistId } from "../utils/watchlist";
 
 const ArrowLeftIcon = FaArrowLeft as unknown as React.ComponentType<{ className?: string }>;
@@ -22,6 +23,7 @@ interface Review {
   name?: string;
   rating: number;
   comment?: string;
+  review_date?: string;
 }
 
 const MovieDetails: React.FC = () => {
@@ -268,6 +270,19 @@ const MovieDetails: React.FC = () => {
               })}
             </div>
           </div>
+
+          <AudienceMoodMeter
+            totalVotes={reviews.length}
+            moodCounts={moodCounts}
+            selectedMood={selectedMood || undefined}
+            onSelectMood={handleMoodSelect}
+          />
+
+          <ThrillPulse
+            reviews={reviews}
+            averageRating={avgRatingValue}
+            reviewCount={reviewCountValue}
+          />
         </div>
       </section>
 

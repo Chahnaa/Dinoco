@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import axios from "axios";
+import { addReview, getMovieReviewStats, getReviews, getUserReviewForMovie } from "../api/api";
 
 interface Review {
   review_id: number;
@@ -49,8 +49,8 @@ const ReviewSystem: React.FC<ReviewSystemProps> = ({ movieId, onReviewSubmitted 
   const fetchReviews = async () => {
     try {
       const [reviewsRes, statsRes] = await Promise.all([
-        axios.get(`/api/reviews/movie/${movieId}`),
-        axios.get(`/api/reviews/movie/${movieId}/stats`),
+        getReviews(movieId),
+        getMovieReviewStats(movieId),
       ]);
 
       setReviews(reviewsRes.data);
@@ -74,9 +74,11 @@ const ReviewSystem: React.FC<ReviewSystemProps> = ({ movieId, onReviewSubmitted 
       setIsAuthenticated(true);
 
       // Get current user's review for this movie
-      const res = await axios.get(`/api/reviews/movie/${movieId}/user/${getUserIdFromToken()}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const userId = getUserIdFromToken();
+      if (!userId) {
+        return;
+      }
+      const res = await getUserReviewForMovie(movieId, userId);
 
       if (res.data) {
         setUserReview(res.data);
@@ -122,17 +124,11 @@ const ReviewSystem: React.FC<ReviewSystemProps> = ({ movieId, onReviewSubmitted 
         return;
       }
 
-      const response = await axios.post(
-        "/api/reviews",
-        {
-          movie_id: movieId,
-          rating,
-          comment,
-        },
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
+      const response = await addReview({
+        movie_id: movieId,
+        rating,
+        comment,
+      });
 
       if (response.status === 200 || response.status === 201) {
         setSuccess(userReview ? "Review updated successfully!" : "Review submitted successfully!");
