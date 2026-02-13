@@ -217,14 +217,16 @@ const ReviewSystem: React.FC<ReviewSystemProps> = ({ movieId, onReviewSubmitted 
             </div>
             <div className="flex justify-center gap-1">
               {[...Array(5)].map((_, i) => (
-                <FaStar
+                <span
                   key={i}
                   className={`text-xl ${
                     i < Math.round(stats?.avg_rating_rounded || 0)
                       ? "text-yellow-400"
                       : "text-gray-600"
                   }`}
-                />
+                >
+                  <FaStar />
+                </span>
               ))}
             </div>
             <div className="text-sm text-gray-300">{stats?.review_count || 0} reviews</div>
@@ -350,12 +352,14 @@ const ReviewSystem: React.FC<ReviewSystemProps> = ({ movieId, onReviewSubmitted 
                       <span className="text-white font-semibold">{review.name}</span>
                       <div className="flex gap-1">
                         {[...Array(5)].map((_, i) => (
-                          <FaStar
+                          <span
                             key={i}
                             className={`text-sm ${
                               i < review.rating ? "text-yellow-400" : "text-gray-600"
                             }`}
-                          />
+                          >
+                            <FaStar />
+                          </span>
                         ))}
                       </div>
                     </div>
