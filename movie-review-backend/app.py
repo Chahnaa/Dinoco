@@ -567,6 +567,111 @@ def get_stats():
             conn.close()
 
 
+@app.route("/api/admin/analytics", methods=["GET"])
+@require_auth
+@require_role('admin')
+def get_admin_analytics():
+    """Get comprehensive admin analytics data."""
+    conn = None
+    try:
+        conn = get_db()
+        cursor = conn.cursor(dictionary=True)
+        
+        # Top 5 most reviewed movies
+        cursor.execute("""
+            SELECT m.movie_id, m.title, m.poster_url, 
+                   COUNT(r.review_id) as review_count,
+                   COALESCE(AVG(r.rating), 0) as avg_rating
+            FROM movies m
+            LEFT JOIN reviews r ON m.movie_id = r.movie_id
+            GROUP BY m.movie_id, m.title, m.poster_url
+            ORDER BY review_count DESC
+            LIMIT 5
+        """)
+        top_reviewed_movies = cursor.fetchall()
+        
+        # Top 5 highest rated movies (minimum 3 reviews)
+        cursor.execute("""
+            SELECT m.movie_id, m.title, m.poster_url,
+                   COUNT(r.review_id) as review_count,
+                   AVG(r.rating) as avg_rating
+            FROM movies m
+            INNER JOIN reviews r ON m.movie_id = r.movie_id
+            GROUP BY m.movie_id, m.title, m.poster_url
+            HAVING COUNT(r.review_id) >= 3
+            ORDER BY avg_rating DESC
+            LIMIT 5
+        """)
+        top_rated_movies = cursor.fetchall()
+        
+        # Recent reviews (last 10)
+        cursor.execute("""
+            SELECT r.review_id, r.rating, r.comment, r.review_date,
+                   u.name as user_name, m.title as movie_title
+            FROM reviews r
+            JOIN users u ON r.user_id = u.user_id
+            JOIN movies m ON r.movie_id = m.movie_id
+            ORDER BY r.review_date DESC
+            LIMIT 10
+        """)
+        recent_reviews = cursor.fetchall()
+        
+        # User activity stats
+        cursor.execute("""
+            SELECT COUNT(DISTINCT user_id) as active_reviewers
+            FROM reviews
+            WHERE review_date >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+        """)
+        active_reviewers = cursor.fetchone()["active_reviewers"]
+        
+        # Rating distribution
+        cursor.execute("""
+            SELECT rating, COUNT(*) as count
+            FROM reviews
+            GROUP BY rating
+            ORDER BY rating DESC
+        """)
+        rating_distribution = cursor.fetchall()
+        
+        # Movies without reviews
+        cursor.execute("""
+            SELECT COUNT(*) as movies_without_reviews
+            FROM movies m
+            LEFT JOIN reviews r ON m.movie_id = r.movie_id
+            WHERE r.review_id IS NULL
+        """)
+        movies_without_reviews = cursor.fetchone()["movies_without_reviews"]
+        
+        # Total stats
+        cursor.execute("SELECT COUNT(*) AS total_movies FROM movies")
+        total_movies = cursor.fetchone()["total_movies"]
+        cursor.execute("SELECT COUNT(*) AS total_users FROM users")
+        total_users = cursor.fetchone()["total_users"]
+        cursor.execute("SELECT COUNT(*) AS total_reviews FROM reviews")
+        total_reviews = cursor.fetchone()["total_reviews"]
+        
+        return jsonify({
+            "overview": {
+                "total_movies": total_movies,
+                "total_users": total_users,
+                "total_reviews": total_reviews,
+                "active_reviewers_30d": active_reviewers,
+                "movies_without_reviews": movies_without_reviews
+            },
+            "top_reviewed_movies": top_reviewed_movies,
+            "top_rated_movies": top_rated_movies,
+            "recent_reviews": recent_reviews,
+            "rating_distribution": rating_distribution
+        })
+        
+    except mysql.connector.Error as e:
+        logger.exception("Failed to fetch admin analytics")
+        return jsonify({"message": "Internal server error"}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
 @app.route("/api/reviews/movie/<int:movie_id>", methods=["GET"])
 def get_movie_reviews(movie_id):
     conn = None
