@@ -31,10 +31,9 @@ services:
       - key: SMTP_USE_TLS
         sync: false
 
-  - type: web
+  - type: static
     name: movie-review-frontend
     runtime: static
-    plan: free
     rootDir: movie-review-frontend
     buildCommand: npm install && npm run build
     staticPublishPath: build
