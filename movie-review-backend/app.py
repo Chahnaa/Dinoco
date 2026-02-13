@@ -807,11 +807,17 @@ def get_recommendations():
         """, (user_id,))
         preferred_genres = cursor.fetchall()
         
-        # Step 2: Get movies user has already reviewed (to exclude)
+        # Step 2: Get movies user has already reviewed (to exclude) + get user's top-rated movies
         cursor.execute("""
-            SELECT movie_id FROM reviews WHERE user_id = %s
+            SELECT r.movie_id, m.title, r.rating, m.genre
+            FROM reviews r
+            JOIN movies m ON r.movie_id = m.movie_id
+            WHERE r.user_id = %s
+            ORDER BY r.rating DESC, r.created_at DESC
         """, (user_id,))
-        watched_movie_ids = [row['movie_id'] for row in cursor.fetchall()]
+        user_reviews = cursor.fetchall()
+        watched_movie_ids = [row['movie_id'] for row in user_reviews]
+        top_rated_movies = [r for r in user_reviews if r['rating'] >= 4.5][:3]  # Top 3 highly rated
         
         recommendations = []
         
@@ -870,14 +876,42 @@ def get_recommendations():
                 WHERE m.movie_id NOT IN ({exclude_placeholders})
                 GROUP BY m.movie_id
                 ORDER BY avg_rating DESC, m.release_year DESC
-                LIMIT %s
-            """, exclude_all + [10 - len(recommendations)])
-            
-            remaining = cursor.fetchall()
-            recommendations.extend(remaining)
-        
-        # Add recommendation reason for each movie
+              EXPLAINABLE recommendation reason for each movie (XAI)
         for movie in recommendations:
+            reason = ""
+            explanation_type = ""
+            
+            # Check if movie is from preferred genre
+            if preferred_genres and movie.get('genre') in [g['genre'] for g in preferred_genres]:
+                genre_info = next((g for g in preferred_genres if g['genre'] == movie['genre']), None)
+                if genre_info:
+                    reason = f"You rated {int(genre_info['watch_count'])} {movie['genre']} movies highly (avg {genre_info['avg_rating']:.1f}⭐)"
+                    explanation_type = "genre_preference"
+            
+            # Check if similar to top-rated movies
+            elif top_rated_movies and movie.get('genre'):
+                similar_top = [m for m in top_rated_movies if m.get('genre') == movie.get('genre')]
+                if similar_top:
+                    reason = f"Similar to '{similar_top[0]['title']}' which you rated {similar_top[0]['rating']:.1f}⭐"
+                    explanation_type = "similar_to_liked"
+            
+            # Trending with high engagement
+            elif movie.get('review_count', 0) >= 5 and movie.get('avg_rating', 0) >= 4.0:
+                reason = f"Trending: {int(movie['review_count'])} reviews with {movie['avg_rating']:.1f}⭐ rating"
+                explanation_type = "trending"
+            
+            # High rating
+            elif movie.get('avg_rating', 0) >= 4.0:
+                reason = f"Highly rated by critics ({movie['avg_rating']:.1f}⭐)"
+                explanation_type = "high_rated"
+            
+            # Fallback
+            else:
+                reason = "Recommended for you"
+                explanation_type = "general"
+            
+            movie['recommendation_reason'] = reason
+            movie['explanation_type'] = explanation_type
             if preferred_genres and movie.get('genre') in [g['genre'] for g in preferred_genres]:
                 movie['recommendation_reason'] = f"Based on your love for {movie['genre']}"
             elif movie.get('review_count', 0) >= 5:
